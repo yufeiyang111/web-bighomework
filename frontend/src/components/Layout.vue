@@ -5,45 +5,9 @@
       <div class="nav-container">
         <div class="nav-left">
           <router-link to="/dashboard" class="logo">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
-  <defs>
-    <!-- 顶部弧形路径（中文） -->
-    <path id="topTextPath" d="M 25,100 A 75,75 0 0,1 175,100" fill="none"/>
-    <!-- 底部弧形路径（英文） -->
-    <path id="bottomTextPath" d="M 175,105 A 75,75 0 0,1 25,105" fill="none"/>
-  </defs>
-  
-  <!-- 外圆环 -->
-  <circle cx="100" cy="100" r="95" fill="none" stroke="#1a5a7a" stroke-width="2.5"/>
-  <circle cx="100" cy="100" r="78" fill="none" stroke="#1a5a7a" stroke-width="1"/>
-  
-  <!-- 内圆（深蓝色背景） -->
-  <circle cx="100" cy="100" r="68" fill="#1a5a7a"/>
-  
-  <!-- 飞机/航空图形 - 简化的纸飞机造型 -->
-  <g transform="translate(100,95)">
-    <!-- 主机身 - 大三角 -->
-    <polygon points="-35,-45 45,-5 -10,40" fill="#d0d5d8"/>
-    <!-- 机翼上部 -->
-    <polygon points="-35,-45 -10,-45 15,-20 -10,40" fill="#b8bfc3"/>
-    <!-- 弧形装饰 -->
-    <path d="M -40,25 Q -15,15 10,45 Q -25,50 -40,25" fill="#1a5a7a" stroke="#1a5a7a"/>
-  </g>
-  
-  <!-- 1952 年份 -->
-  <text x="100" y="158" text-anchor="middle" fill="#d0d5d8" font-family="Times New Roman, Georgia, serif" font-size="13" font-weight="bold" letter-spacing="1">1952</text>
-  
-  <!-- 顶部中文 - 南昌航空大学 -->
-  <text fill="#1a5a7a" font-family="SimSun, KaiTi, STKaiti, serif" font-size="15" font-weight="600">
-    <textPath href="#topTextPath" startOffset="50%" text-anchor="middle">南昌航空大学</textPath>
-  </text>
-  
-  <!-- 底部英文 -->
-  <text fill="#1a5a7a" font-family="Times New Roman, Georgia, serif" font-size="8.5" letter-spacing="1.5">
-    <textPath href="#bottomTextPath" startOffset="50%" text-anchor="middle">NANCHANG HANGKONG UNIVERSITY</textPath>
-  </text>
-</svg>
-
+            <svg height="24" viewBox="0 0 24 24" width="24" fill="currentColor">
+              <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+            </svg>
             <span>教育系统</span>
           </router-link>
           
