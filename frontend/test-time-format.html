@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>时间格式化测试</title>
+    <meta charset="UTF-8">
+</head>
+<body>
+    <h2>时间格式化测试</h2>
+    <div id="results"></div>
+
+    <script>
+        // 这是修复后的formatTime函数
+        const formatTime = (timestamp) => {
+            if (!timestamp) return ''
+            
+            // MySQL返回的时间格式: "2025-12-04 17:47:45"
+            // 需要转换为标准格式以便正确解析
+            let dateStr = timestamp
+            if (typeof timestamp === 'string' && !timestamp.includes('T')) {
+                // 如果是MySQL格式(本地时间),直接转换
+                dateStr = timestamp.replace(' ', 'T')
+            }
+            
+            const date = new Date(dateStr)
+            const now = new Date()
+            const diff = now - date
+            
+            // 小于1分钟
+            if (diff < 60000) return '刚刚'
+            // 小于1小时
+            if (diff < 3600000) return `${Math.floor(diff / 60000)}分钟前`
+            // 小于1天
+            if (diff < 86400000) return `${Math.floor(diff / 3600000)}小时前`
+            // 小于7天
+            if (diff < 604800000) return `${Math.floor(diff / 86400000)}天前`
+            
+            // 超过7天,显示具体日期时间
+            return date.toLocaleString('zh-CN', {
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit'
+            })
+        }
+
+        // 测试不同时间
+        const now = new Date()
+        const tests = [
+            { label: '30秒前', time: new Date(now - 30000) },
+            { label: '5分钟前', time: new Date(now - 5 * 60000) },
+            { label: '2小时前', time: new Date(now - 2 * 3600000) },
+            { label: '1天前', time: new Date(now - 86400000) },
+            { label: '3天前', time: new Date(now - 3 * 86400000) },
+            { label: '10天前', time: new Date(now - 10 * 86400000) },
+        ]
+
+        let html = '<table border="1" style="border-collapse: collapse; width: 600px;">'
+        html += '<tr><th>测试</th><th>实际时间</th><th>MySQL格式</th><th>显示结果</th></tr>'
+        
+        tests.forEach(test => {
+            // 模拟MySQL返回的格式
+            const mysqlFormat = test.time.toISOString().replace('T', ' ').substring(0, 19)
+            const result = formatTime(mysqlFormat)
+            
+            html += `<tr>
+                <td>${test.label}</td>
+                <td>${test.time.toLocaleString('zh-CN')}</td>
+                <td>${mysqlFormat}</td>
+                <td><strong>${result}</strong></td>
+            </tr>`
+        })
+        
+        html += '</table>'
+        
+        document.getElementById('results').innerHTML = html
+        
+        console.log('现在时间:', now.toLocaleString('zh-CN'))
+    </script>
+</body>
+</html>
