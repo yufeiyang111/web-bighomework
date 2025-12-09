@@ -112,3 +112,81 @@ export const approveTeacher = (approvalId, approved, note = '') => {
     data: { approvalId, approved, note }
   })
 }
+
+// ==================== 人脸识别相关API ====================
+
+// 注册/更新人脸信息
+export const registerFace = (faceImage) => {
+  const formData = new FormData()
+  formData.append('faceImage', faceImage)
+  
+  return request({
+    url: '/face/register',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}
+
+// 获取人脸注册状态
+export const getFaceStatus = () => {
+  return request({
+    url: '/face/status',
+    method: 'get'
+  })
+}
+
+// 删除人脸信息
+export const deleteFace = () => {
+  return request({
+    url: '/face/delete',
+    method: 'delete'
+  })
+}
+
+// 检测眨眼动作
+export const detectBlink = (frameBase64) => {
+  return request({
+    url: '/face/detect-blink',
+    method: 'post',
+    data: { frame: frameBase64 }
+  })
+}
+
+// 检测头部姿态
+export const detectHeadPose = (frameBase64) => {
+  return request({
+    url: '/face/detect-head-pose',
+    method: 'post',
+    data: { frame: frameBase64 }
+  })
+}
+
+// 人脸登录（带活体检测）
+export const faceLoginWithLiveness = (faceImageBase64, livenessData) => {
+  return request({
+    url: '/auth/face-login',
+    method: 'post',
+    data: {
+      faceImage: faceImageBase64,
+      livenessData: livenessData
+    }
+  })
+}
+
+// 人脸登录（旧接口，文件上传方式）
+export const faceLogin = (faceImage) => {
+  const formData = new FormData()
+  formData.append('faceImage', faceImage)
+  
+  return request({
+    url: '/auth/face-login',
+    method: 'post',
+    data: formData,
+    headers: {
+      'Content-Type': 'multipart/form-data'
+    }
+  })
+}

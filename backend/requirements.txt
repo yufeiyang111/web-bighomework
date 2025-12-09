@@ -1,8 +1,16 @@
 Flask==3.0.0
 Flask-CORS==4.0.0
 Flask-JWT-Extended==4.6.0
+Flask-SocketIO==5.3.6
+python-socketio==5.10.0
+python-engineio==4.8.1
 openai>=1.0.0
 Pillow>=10.0.0
 PyMySQL==1.1.0
 python-dotenv==1.0.0
 Werkzeug==3.0.1
+deepface>=0.0.79
+tf-keras>=2.15.0
+numpy>=1.24.0
+opencv-python>=4.8.0
+scipy>=1.11.0
