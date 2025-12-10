@@ -4,6 +4,8 @@ import piniaPluginPersistedstate from 'pinia-plugin-persistedstate'
 import ElementPlus from 'element-plus'
 import 'element-plus/dist/index.css'
 import * as ElementPlusIconsVue from '@element-plus/icons-vue'
+// 导入 Font Awesome 图标库
+import '@fortawesome/fontawesome-free/css/all.css'
 import App from './App.vue'
 import router from './router'
 

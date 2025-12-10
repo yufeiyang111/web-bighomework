@@ -98,7 +98,60 @@ const routes = [
     name: 'StudentCheckin',
     component: () => import('@/views/checkin/StudentCheckin.vue'),
     meta: { requiresAuth: true, requiresRole: 'student' }
-  }
+  },
+  // 成绩/课程管理模块 - 教师/管理员
+  {
+    path: '/teacher/class-manager',
+    name: 'ClassManager',
+    component: () => import('@/views/teacher/ClassManager.vue'),
+    meta: { requiresAuth: true, requiresRole: 'teacher' }
+  },
+  {
+    path: '/teacher/classes/:id',
+    name: 'ClassDetail',
+    component: () => import('@/views/ClassDetail.vue'),
+    meta: { requiresAuth: true, requiresRole: 'teacher' }
+  },
+  {
+    path: '/teacher/course-manager',
+    name: 'CourseManager',
+    component: () => import('@/views/teacher/CourseManager.vue'),
+    meta: { requiresAuth: true, requiresRole: 'teacher' }
+  },
+  {
+    path: '/teacher/exam-manager',
+    name: 'ExamManager',
+    component: () => import('@/views/teacher/ExamManager.vue'),
+    meta: { requiresAuth: true, requiresRole: 'teacher' }
+  },
+  {
+    path: '/teacher/score-manager',
+    name: 'ScoreManager',
+    component: () => import('@/views/teacher/ScoreManager.vue'),
+    meta: { requiresAuth: true, requiresRole: 'teacher' }
+  },
+  {
+    path: '/teacher/importer',
+    name: 'GradeImporter',
+    component: () => import('@/views/teacher/GradeImporter.vue'),
+    meta: { requiresAuth: true, requiresRole: 'teacher' }
+  },
+  {
+    path: '/teacher/question-chat',
+    name: 'QuestionChat',
+    component: () => import('@/views/teacher/QuestionChat.vue'),
+    meta: { requiresAuth: true, requiresRole: 'teacher' }
+  },
+  {
+    path: '/teacher/Material',
+    name: 'Material',
+    component: () => import('@/views/Yves/pages/Material.vue')
+  },
+  {
+    path: '/teacher/Chapter',
+    name: 'Chapter',
+    component: () => import('@/views/Yves/pages/Chapter.vue')
+  },
 ]
 
 const router = createRouter({

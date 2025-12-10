@@ -5,7 +5,7 @@ import { nodePolyfills } from 'vite-plugin-node-polyfills'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 
 // 后端服务器地址配置 - 修改这里即可切换环境
-const BACKEND_HOST = '192.168.95.32'
+const BACKEND_HOST = '192.168.95.21'
 const BACKEND_PORT = '5000'
 // 使用 HTTPS 连接后端
 const BACKEND_URL = `https://${BACKEND_HOST}:${BACKEND_PORT}`

@@ -15,6 +15,7 @@ from student_roster_service import StudentRosterService
 from face_service import FaceService
 from message_service import MessageService
 from websocket_server import socketio, init_socketio
+from models import db
 
 app = Flask(__name__)
 
@@ -23,13 +24,34 @@ app.config['SECRET_KEY'] = Config.SECRET_KEY
 app.config['JWT_SECRET_KEY'] = Config.JWT_SECRET_KEY
 app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(seconds=Config.JWT_ACCESS_TOKEN_EXPIRES)
 
+# 配置数据库
+app.config['SQLALCHEMY_DATABASE_URI'] = Config.get_database_uri()
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
+app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
+    'pool_recycle': 300,
+    'pool_pre_ping': True
+}
+
+# 初始化SQLAlchemy
+db.init_app(app)
+
 # 设置JWT token位置 - 从 header 中读取
 app.config['JWT_TOKEN_LOCATION'] = ['headers']
 app.config['JWT_HEADER_NAME'] = 'Authorization'
 app.config['JWT_HEADER_TYPE'] = 'Bearer'
 
-# 初始化CORS
-CORS(app, resources={r"/*": {"origins": "*"}})
+# 初始化CORS - 允许所有来源，并明确支持预检请求
+# Flask-CORS 会自动处理 OPTIONS 预检请求
+CORS(app, 
+     resources={r"/*": {
+         "origins": "*",
+         "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
+         "allow_headers": ["Content-Type", "Authorization", "X-Requested-With"],
+         "expose_headers": ["Content-Type", "Authorization"],
+         "supports_credentials": False
+     }},
+     supports_credentials=False,
+     automatic_options=True)  # 确保自动处理 OPTIONS 请求
 
 # 初始化JWT
 jwt = JWTManager(app)
@@ -72,6 +94,26 @@ def check_if_token_in_blocklist(jwt_header, jwt_payload):
     query = "SELECT token_id FROM token_blacklist WHERE token = %s"
     result = Database.execute_query(query, (jti,), fetch_one=True)
     return result is not None
+
+# ==================== 导入所有模型 ====================
+# 确保所有模型都被导入并注册到 SQLAlchemy（必须在 db.init_app 之后）
+with app.app_context():
+    from models import user, class_model, course, exam, question, score, notification, role
+    # 导入所有模型类，确保它们被注册到 SQLAlchemy
+    _ = [
+        user.User, user.StudentClass,
+        class_model.Class, class_model.ChatRoom,
+        course.Course, course.CourseClass, course.CourseTeacher, course.CourseMaterial, course.Assignment,
+        exam.Exam, exam.ExamClass, exam.ExamResult, exam.QuestionBank, exam.MCQQuestion, exam.StudentAnswer,
+        question.Question, question.QuestionStudent, question.Answer, question.Reply, question.ChatMessage,
+        score.Score,
+        notification.Notification
+    ]
+
+# ==================== 注册 API Blueprint ====================
+# 导入并注册 teacher、student 等资源路由（必须在创建 app 和 jwt 之后）
+from resources import api_bp
+app.register_blueprint(api_bp)
 
 # ==================== 认证相关路由 ====================
 

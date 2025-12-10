@@ -24,6 +24,13 @@ class Config:
         'cursorclass': 'DictCursor'
     }
     
+    # SQLAlchemy 数据库 URI
+    @staticmethod
+    def get_database_uri():
+        """构建 SQLAlchemy 数据库 URI"""
+        config = Config.DB_CONFIG
+        return f"mysql+pymysql://{config['user']}:{config['password']}@{config['host']}:{config['port']}/{config['database']}?charset={config['charset']}"
+    
     # 邮件配置
     MAIL_SERVER = os.getenv('MAIL_SERVER', 'smtp.qq.com')
     MAIL_PORT = int(os.getenv('MAIL_PORT', 465))

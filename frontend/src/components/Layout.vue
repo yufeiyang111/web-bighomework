@@ -57,9 +57,43 @@
             <router-link v-if="userStore.hasRole('teacher')" to="/student-roster" :class="['nav-link', { active: isActive('/student-roster') }]">
               学生管理
             </router-link>
+
+            <!-- 教师管理功能：与学生管理同级展示 -->
+            <router-link 
+              v-if="userStore.hasRole('teacher') || userStore.hasRole('admin')" 
+              to="/teacher/class-manager" 
+              :class="['nav-link', { active: isActive('/teacher/class-manager') }]">
+              班级管理
+            </router-link>
+            <router-link 
+              v-if="userStore.hasRole('teacher') || userStore.hasRole('admin')" 
+              to="/teacher/exam-manager" 
+              :class="['nav-link', { active: isActive('/teacher/exam-manager') }]">
+              考试管理
+            </router-link>
+            <router-link 
+              v-if="userStore.hasRole('teacher') || userStore.hasRole('admin')" 
+              to="/teacher/score-manager" 
+              :class="['nav-link', { active: isActive('/teacher/score-manager') }]">
+              成绩管理
+            </router-link>
+            <router-link 
+              v-if="userStore.hasRole('teacher') || userStore.hasRole('admin')" 
+              to="/teacher/course-manager" 
+              :class="['nav-link', { active: isActive('/teacher/course-manager') }]">
+              课程管理
+            </router-link>
             
             <router-link v-if="userStore.hasRole('admin')" to="/admin" :class="['nav-link', { active: isActive('/admin') }]">
               管理中心
+            </router-link>
+
+            <router-link to="Material" :class="['nav-link', { active: isActive('/admin') }]">
+              资料中心
+            </router-link>
+
+            <router-link to="Chapter" :class="['nav-link', { active: isActive('/admin') }]">
+              章节学习
             </router-link>
           </nav>
         </div>
