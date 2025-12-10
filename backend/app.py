@@ -985,6 +985,7 @@ def serve_message_file(filename):
 
 if __name__ == '__main__':
     import os
+    import ssl
     
     if not os.path.exists(Config.UPLOAD_FOLDER):
         os.makedirs(Config.UPLOAD_FOLDER)
@@ -995,17 +996,41 @@ if __name__ == '__main__':
     # 初始化 WebSocket
     init_socketio(app)
     
+    # 检查是否存在 SSL 证书
+    ssl_cert = 'cert.pem'
+    ssl_key = 'key.pem'
+    use_ssl = os.path.exists(ssl_cert) and os.path.exists(ssl_key)
+    
     print("=" * 50)
     print("服务器启动中...")
-    print(f"HTTP API: http://0.0.0.0:5000")
-    print(f"WebSocket: ws://0.0.0.0:5000/socket.io")
+    if use_ssl:
+        print(f"HTTPS API: https://0.0.0.0:5000")
+        print(f"WebSocket: wss://0.0.0.0:5000/socket.io")
+        print("(使用自签名证书)")
+    else:
+        print(f"HTTP API: http://0.0.0.0:5000")
+        print(f"WebSocket: ws://0.0.0.0:5000/socket.io")
     print("=" * 50)
     
     # 使用 socketio.run 代替 app.run
-    socketio.run(
-        app, 
-        host='0.0.0.0', 
-        port=5000, 
-        debug=False,
-        log_output=True
-    )
+    if use_ssl:
+        # 创建 SSL 上下文（gevent 需要 SSLContext 对象）
+        ssl_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        ssl_context.load_cert_chain(ssl_cert, ssl_key)
+        
+        socketio.run(
+            app, 
+            host='0.0.0.0', 
+            port=5000, 
+            debug=False,
+            log_output=True,
+            ssl_context=ssl_context
+        )
+    else:
+        socketio.run(
+            app, 
+            host='0.0.0.0', 
+            port=5000, 
+            debug=False,
+            log_output=True
+        )

@@ -622,8 +622,24 @@ const startVoiceCall = async () => {
 
 // 发起通话
 const initiateCall = async (video) => {
+  console.log('[通话] ========== 发起通话 ==========')
+  console.log('[通话] 目标用户:', currentChat.value?.other_user_id)
+  console.log('[通话] WebSocket 连接状态:', socketService.isConnected())
+  
+  // 检查 WebSocket 连接
+  if (!socketService.isConnected()) {
+    ElMessage.error('WebSocket 未连接，无法发起通话')
+    console.error('[通话] WebSocket 未连接!')
+    return
+  }
+  
   localStream = await getMediaStream(video)
-  if (!localStream) return
+  if (!localStream) {
+    console.error('[通话] 获取媒体流失败')
+    return
+  }
+  
+  console.log('[通话] 媒体流获取成功')
   
   showVideoCall.value = true
   callStatus.value = '正在呼叫...'
@@ -637,6 +653,7 @@ const initiateCall = async (video) => {
   
   // 创建 Peer 连接（作为发起方）
   // 使用 trickle: false 确保一次性发送完整的 offer
+  console.log('[通话] 创建 SimplePeer 连接...')
   peer = new SimplePeer({
     initiator: true,
     trickle: false,
@@ -651,8 +668,10 @@ const initiateCall = async (video) => {
   })
   
   peer.on('signal', (signal) => {
-    console.log('发送呼叫信号:', signal.type)
-    socketService.callUser(currentChat.value.other_user_id, signal, video)
+    console.log('[通话] SimplePeer 生成信号:', signal.type)
+    console.log('[通话] 发送 call_user 到服务器, receiver_id:', currentChat.value.other_user_id)
+    const result = socketService.callUser(currentChat.value.other_user_id, signal, video)
+    console.log('[通话] callUser 返回:', result)
   })
   
   peer.on('stream', (stream) => {

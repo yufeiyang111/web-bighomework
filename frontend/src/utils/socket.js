@@ -22,7 +22,16 @@ class SocketService {
       return
     }
 
-    console.log('[Socket] 正在连接到:', config.wsUrl)
+    console.log('[Socket] ========== 开始连接 ==========')
+    console.log('[Socket] 目标地址:', config.wsUrl)
+    console.log('[Socket] Token 前50字符:', token.substring(0, 50))
+    
+    // 如果已有 socket 实例但未连接，先断开
+    if (this.socket) {
+      console.log('[Socket] 清理旧的 socket 实例')
+      this.socket.disconnect()
+      this.socket = null
+    }
     
     this.socket = io(config.wsUrl, {
       transports: ['websocket', 'polling'],
@@ -31,6 +40,8 @@ class SocketService {
       reconnectionAttempts: 5,
       reconnectionDelay: 1000
     })
+    
+    console.log('[Socket] Socket.IO 实例已创建')
 
     this.socket.on('connect', () => {
       console.log('[Socket] 已连接, socket.id:', this.socket.id)

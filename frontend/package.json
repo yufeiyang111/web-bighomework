@@ -8,19 +8,24 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.3.4",
-    "vue-router": "^4.2.5",
+    "@element-plus/icons-vue": "^2.3.1",
+    "axios": "^1.6.2",
+    "buffer": "^6.0.3",
+    "element-plus": "^2.4.4",
+    "face-api.js": "^0.22.2",
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.0",
-    "axios": "^1.6.2",
-    "element-plus": "^2.4.4",
-    "@element-plus/icons-vue": "^2.3.1",
-    "face-api.js": "^0.22.2",
+    "process": "^0.11.10",
+    "simple-peer": "^9.11.1",
     "socket.io-client": "^4.7.2",
-    "simple-peer": "^9.11.1"
+    "stream-browserify": "^3.0.0",
+    "vue": "^3.3.4",
+    "vue-router": "^4.2.5"
   },
   "devDependencies": {
+    "@vitejs/plugin-basic-ssl": "^1.2.0",
     "@vitejs/plugin-vue": "^4.4.0",
-    "vite": "^5.0.0"
+    "vite": "^5.0.0",
+    "vite-plugin-node-polyfills": "^0.24.0"
   }
 }
