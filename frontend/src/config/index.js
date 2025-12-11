@@ -21,7 +21,8 @@ export const config = {
   wsUrl: API_BASE,
   
   // 静态资源地址（图片、文件等）
-  staticUrl: API_BASE,
+  // 使用空字符串，让静态资源通过 Vite 代理访问，避免 SSL 证书问题
+  staticUrl: '',
 }
 
 export default config

@@ -81,8 +81,8 @@ const routes = [
     meta: { requiresAuth: true, requiresRole: 'teacher' }
   },
   {
-    path: '/checkin/records',
-    name: 'CheckinRecords',
+    path: '/checkin/records/:id',
+    name: 'CheckinRecordsDetail',
     component: () => import('@/views/checkin/CheckinRecords.vue'),
     meta: { requiresAuth: true, requiresRole: 'teacher' }
   },
@@ -98,6 +98,13 @@ const routes = [
     name: 'StudentCheckin',
     component: () => import('@/views/checkin/StudentCheckin.vue'),
     meta: { requiresAuth: true, requiresRole: 'student' }
+  },
+  // 扫码签到页面（手机扫码后跳转）
+  {
+    path: '/checkin/scan',
+    name: 'ScanCheckin',
+    component: () => import('@/views/checkin/ScanCheckin.vue'),
+    meta: { requiresAuth: true }
   },
   // 成绩/课程管理模块 - 教师/管理员
   {
@@ -151,7 +158,7 @@ const routes = [
     path: '/teacher/Chapter',
     name: 'Chapter',
     component: () => import('@/views/Yves/pages/Chapter.vue')
-  },
+  }
 ]
 
 const router = createRouter({

@@ -108,6 +108,14 @@ class SocketService {
   // 监听事件
   on(event, callback) {
     if (!this.socket) return
+    
+    // 先移除该事件的所有旧监听器，防止重复注册
+    if (this.listeners.has(event)) {
+      const oldCallbacks = this.listeners.get(event)
+      oldCallbacks.forEach(cb => this.socket.off(event, cb))
+      this.listeners.delete(event)
+    }
+    
     this.socket.on(event, callback)
     
     // 保存监听器以便清理
@@ -182,6 +190,35 @@ class SocketService {
   // 获取当前用户ID
   getUserId() {
     return this.userId
+  }
+
+  // 通用 emit 方法
+  emit(event, data) {
+    if (!this.socket?.connected) {
+      console.error('[Socket] 无法发送事件: 未连接')
+      return false
+    }
+    this.socket.emit(event, data)
+    return true
+  }
+
+  // 加入群聊房间
+  joinGroup(groupId) {
+    return this.emit('join_group', { group_id: groupId })
+  }
+
+  // 离开群聊房间
+  leaveGroupRoom(groupId) {
+    return this.emit('leave_group_room', { group_id: groupId })
+  }
+
+  // 发送群消息
+  sendGroupMessage(groupId, messageType, content) {
+    return this.emit('send_group_message', {
+      group_id: groupId,
+      message_type: messageType,
+      content: content
+    })
   }
 }
 

@@ -2,7 +2,7 @@
   <Layout pageTitle="私信">
     <div class="chat-container">
       <!-- 左侧会话列表 -->
-      <div class="conversation-list">
+      <div class="conversation-list" :class="{ show: !mobileShowChat }">
         <div class="search-box">
           <el-input v-model="searchKeyword" placeholder="搜索用户" prefix-icon="Search" @input="handleSearch" clearable />
         </div>
@@ -54,9 +54,12 @@
       </div>
 
       <!-- 右侧聊天区域 -->
-      <div class="chat-area" v-if="currentChat">
+      <div class="chat-area" :class="{ show: mobileShowChat }" v-if="currentChat">
         <div class="chat-header">
           <div class="user-info">
+            <button class="mobile-back-btn" @click="mobileShowChat = false">
+              <el-icon :size="20"><ArrowLeft /></el-icon>
+            </button>
             <el-avatar :src="getAvatarUrl(currentChat.other_user_avatar)" :size="40">{{ currentChat.other_user_name?.[0] }}</el-avatar>
             <div class="info">
               <span class="name">{{ currentChat.other_user_name }}</span>
@@ -75,105 +78,137 @@
           <div class="load-more" v-if="hasMoreMessages">
             <el-button link @click="loadMoreMessages" :loading="loadingMore">加载更多</el-button>
           </div>
-          <div class="message-item" v-for="msg in messages" :key="msg.message_id" :class="{ mine: msg.sender_id === userId }">
-            <el-avatar v-if="msg.sender_id !== userId" :src="getAvatarUrl(msg.sender_avatar)" :size="36">{{ msg.sender_name?.[0] }}</el-avatar>
-            <div class="message-content">
-              <div class="bubble" :class="[msg.message_type, { sending: msg.sending }]">
-                <!-- 文本消息 -->
-                <template v-if="msg.message_type === 'text'">
-                  <span class="text-content">{{ msg.content }}</span>
-                </template>
-                <!-- 图片消息 -->
-                <template v-else-if="msg.message_type === 'image'">
-                  <el-image :src="getFileUrl(msg.file_url)" fit="cover" :preview-src-list="[getFileUrl(msg.file_url)]" class="msg-image" />
-                </template>
-                <!-- 文件消息 -->
-                <template v-else-if="msg.message_type === 'file'">
-                  <div class="file-msg" @click="downloadFile(msg)">
-                    <el-icon class="file-icon"><Document /></el-icon>
-                    <div class="file-info">
-                      <span class="file-name">{{ msg.file_name }}</span>
-                      <span class="file-size">{{ formatFileSize(msg.file_size) }}</span>
-                    </div>
-                    <el-icon class="download-icon"><Download /></el-icon>
-                  </div>
-                </template>
-                <!-- 视频消息 -->
-                <template v-else-if="msg.message_type === 'video'">
-                  <video :src="getFileUrl(msg.file_url)" controls class="msg-video"></video>
-                </template>
-                <!-- 语音消息 -->
-                <template v-else-if="msg.message_type === 'voice'">
-                  <div class="voice-msg" @click="playVoice(msg)">
-                    <el-icon><Microphone /></el-icon>
-                    <span>{{ msg.duration || '0' }}''</span>
-                  </div>
-                </template>
-                <!-- 表情消息 -->
-                <template v-else-if="msg.message_type === 'emoji'">
-                  <span class="emoji-content">{{ msg.content }}</span>
-                </template>
-                <!-- 视频通话记录 -->
-                <template v-else-if="msg.message_type === 'video_call'">
-                  <div class="call-msg">
-                    <el-icon class="call-icon video"><VideoCamera /></el-icon>
-                    <span>视频通话 · {{ msg.content }}</span>
-                  </div>
-                </template>
-                <!-- 语音通话记录 -->
-                <template v-else-if="msg.message_type === 'voice_call'">
-                  <div class="call-msg">
-                    <el-icon class="call-icon voice"><Phone /></el-icon>
-                    <span>语音通话 · {{ msg.content }}</span>
-                  </div>
-                </template>
+          
+          <template v-for="(msg, index) in messages" :key="msg.message_id">
+            <!-- 时间分隔线 -->
+            <div class="time-divider" v-if="shouldShowTimeDivider(msg, index)">
+              {{ formatTimeDivider(msg.created_at) }}
+            </div>
+            
+            <div class="message-item" :class="{ mine: msg.sender_id === userId }">
+              <!-- 对方消息：头像在左 -->
+              <div class="avatar-box" v-if="msg.sender_id !== userId">
+                <el-avatar :src="getAvatarUrl(msg.sender_avatar)" :size="40">{{ msg.sender_name?.[0] }}</el-avatar>
               </div>
-              <div class="msg-meta">
-                <span class="time">{{ formatMsgTime(msg.created_at) }}</span>
-                <el-icon v-if="msg.sender_id === userId && msg.is_read" class="read-icon"><Check /></el-icon>
+              
+              <div class="message-body">
+                <!-- 对方消息显示名字 -->
+                <div class="sender-name" v-if="msg.sender_id !== userId">{{ msg.sender_name }}</div>
+                
+                <div class="bubble-wrapper">
+                  <div class="bubble" :class="[msg.message_type, { sending: msg.sending }]">
+                    <!-- 文本消息 -->
+                    <template v-if="msg.message_type === 'text'">
+                      <span class="text-content">{{ msg.content }}</span>
+                    </template>
+                    <!-- 图片消息 -->
+                    <template v-else-if="msg.message_type === 'image'">
+                      <el-image :src="getFileUrl(msg.file_url)" fit="cover" :preview-src-list="[getFileUrl(msg.file_url)]" class="msg-image" />
+                    </template>
+                    <!-- 文件消息 -->
+                    <template v-else-if="msg.message_type === 'file'">
+                      <div class="file-msg" @click="downloadFile(msg)">
+                        <div class="file-info">
+                          <span class="file-name">{{ msg.file_name }}</span>
+                          <span class="file-size">{{ formatFileSize(msg.file_size) }}</span>
+                        </div>
+                        <div class="file-icon-box">
+                          <el-icon class="file-icon"><Document /></el-icon>
+                        </div>
+                      </div>
+                    </template>
+                    <!-- 视频消息 -->
+                    <template v-else-if="msg.message_type === 'video'">
+                      <video :src="getFileUrl(msg.file_url)" controls class="msg-video"></video>
+                    </template>
+                    <!-- 语音消息 -->
+                    <template v-else-if="msg.message_type === 'voice'">
+                      <div class="voice-msg" @click="playVoice(msg)">
+                        <el-icon><Microphone /></el-icon>
+                        <span>{{ msg.duration || '0' }}''</span>
+                      </div>
+                    </template>
+                    <!-- 表情消息 -->
+                    <template v-else-if="msg.message_type === 'emoji'">
+                      <span class="emoji-content">{{ msg.content }}</span>
+                    </template>
+                    <!-- 视频通话记录 -->
+                    <template v-else-if="msg.message_type === 'video_call'">
+                      <div class="call-msg">
+                        <el-icon class="call-icon video"><VideoCamera /></el-icon>
+                        <span>视频通话 · {{ msg.content }}</span>
+                      </div>
+                    </template>
+                    <!-- 语音通话记录 -->
+                    <template v-else-if="msg.message_type === 'voice_call'">
+                      <div class="call-msg">
+                        <el-icon class="call-icon voice"><Phone /></el-icon>
+                        <span>语音通话 · {{ msg.content }}</span>
+                      </div>
+                    </template>
+                  </div>
+                </div>
+              </div>
+              
+              <!-- 自己消息：头像在右 -->
+              <div class="avatar-box" v-if="msg.sender_id === userId">
+                <el-avatar :src="getAvatarUrl(userStore.userInfo?.photoUrl)" :size="40">{{ userStore.userInfo?.realName?.[0] }}</el-avatar>
               </div>
             </div>
-            <el-avatar v-if="msg.sender_id === userId" :src="getAvatarUrl(userStore.userInfo?.photoUrl)" :size="36">{{ userStore.userInfo?.realName?.[0] }}</el-avatar>
-          </div>
+          </template>
+          
           <div class="typing-indicator" v-if="isTyping">
             <span>对方正在输入</span>
             <span class="dots"><span>.</span><span>.</span><span>.</span></span>
           </div>
         </div>
 
-        <!-- 输入区域 -->
+        <!-- 输入区域 - 微信风格 -->
         <div class="input-area">
-          <div class="toolbar">
-            <el-upload :show-file-list="false" :before-upload="handleImageUpload" accept="image/*">
-              <el-button :icon="Picture" title="发送图片" />
-            </el-upload>
-            <el-upload :show-file-list="false" :before-upload="handleVideoUpload" accept="video/*">
-              <el-button :icon="Film" title="发送视频" />
-            </el-upload>
-            <el-upload :show-file-list="false" :before-upload="handleFileUpload">
-              <el-button :icon="Folder" title="发送文件" />
-            </el-upload>
-            <el-popover trigger="click" width="320" :teleported="false">
-              <template #reference>
-                <el-button title="表情">😊</el-button>
-              </template>
-              <div class="emoji-picker">
-                <span v-for="emoji in emojis" :key="emoji" class="emoji-item" @click="insertEmoji(emoji)">{{ emoji }}</span>
-              </div>
-            </el-popover>
+          <div class="toolbar-row">
+            <div class="toolbar-left">
+              <el-popover trigger="click" width="320" :teleported="false">
+                <template #reference>
+                  <svg class="tool-icon emoji-icon" viewBox="0 0 24 24" title="表情">
+                    <circle cx="12" cy="12" r="10" fill="none" stroke="currentColor" stroke-width="1.5"/>
+                    <circle cx="8" cy="10" r="1.2" fill="currentColor"/>
+                    <circle cx="16" cy="10" r="1.2" fill="currentColor"/>
+                    <path d="M8 14.5c0 0 1.5 2.5 4 2.5s4-2.5 4-2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  </svg>
+                </template>
+                <div class="emoji-picker">
+                  <span v-for="emoji in emojis" :key="emoji" class="emoji-item" @click="insertEmoji(emoji)">{{ emoji }}</span>
+                </div>
+              </el-popover>
+              <el-upload :show-file-list="false" :before-upload="handleImageUpload" accept="image/*">
+                <el-icon class="tool-icon" title="图片"><Picture /></el-icon>
+              </el-upload>
+              <el-upload :show-file-list="false" :before-upload="handleFileUpload">
+                <el-icon class="tool-icon" title="文件"><Folder /></el-icon>
+              </el-upload>
+              <el-upload :show-file-list="false" :before-upload="handleVideoUpload" accept="video/*">
+                <el-icon class="tool-icon" title="视频"><Film /></el-icon>
+              </el-upload>
+            </div>
+            <div class="toolbar-right">
+              <el-icon class="tool-icon" @click="startVoiceCall" title="语音通话"><Microphone /></el-icon>
+              <el-icon class="tool-icon" @click="startVideoCall" title="视频通话"><VideoCamera /></el-icon>
+            </div>
           </div>
-          <div class="input-box">
+          <div class="input-wrapper">
             <el-input 
               v-model="inputMessage" 
               type="textarea" 
-              :rows="3" 
-              placeholder="输入消息，Enter发送，Shift+Enter换行" 
+              :rows="4" 
+              placeholder="" 
               @keydown="handleKeydown"
               @input="handleTyping"
               resize="none"
             />
-            <el-button type="primary" @click="sendMessage" :disabled="!inputMessage.trim()" :loading="sending">
-              发送
+          </div>
+          <div class="send-row">
+            <el-button @click="sendMessage" :disabled="!inputMessage.trim()" :loading="sending">
+              发送(S)
             </el-button>
           </div>
         </div>
@@ -191,43 +226,132 @@
     <!-- 视频/语音通话弹窗 -->
     <el-dialog 
       v-model="showVideoCall" 
-      :title="callStatus" 
-      width="800px" 
+      :show-close="false"
+      width="900px" 
       :close-on-click-modal="false" 
       :close-on-press-escape="false"
-      @close="endCall"
       class="video-call-dialog"
     >
-      <div class="video-call-container">
-        <video ref="remoteVideo" autoplay playsinline class="remote-video"></video>
-        <video ref="localVideo" autoplay playsinline muted class="local-video"></video>
-        <div class="call-info" v-if="!callConnected">
-          <el-avatar :src="getAvatarUrl(currentChat?.other_user_avatar)" :size="100">{{ currentChat?.other_user_name?.[0] }}</el-avatar>
-          <p>{{ callStatus }}</p>
+      <div class="video-call-wrapper">
+        <!-- 通话头部信息 -->
+        <div class="call-header">
+          <div class="call-user-info">
+            <el-avatar :src="getAvatarUrl(currentChat?.other_user_avatar)" :size="36">{{ currentChat?.other_user_name?.[0] }}</el-avatar>
+            <div class="call-user-detail">
+              <span class="call-user-name">{{ currentChat?.other_user_name }}</span>
+              <span class="call-status-text">{{ callStatusText }}</span>
+            </div>
+          </div>
+          <div class="call-timer" v-if="callConnected">{{ callDuration }}</div>
+        </div>
+
+        <!-- 视频区域 -->
+        <div class="video-call-container" :class="{ 'voice-only': !isVideoCall }">
+          <!-- 语音通话时显示头像 -->
+          <div class="voice-call-display" v-if="!isVideoCall">
+            <div class="voice-avatar-wrapper">
+              <el-avatar :src="getAvatarUrl(currentChat?.other_user_avatar)" :size="120">{{ currentChat?.other_user_name?.[0] }}</el-avatar>
+              <div class="voice-wave" v-if="callConnected">
+                <span></span><span></span><span></span>
+              </div>
+            </div>
+            <p class="voice-user-name">{{ currentChat?.other_user_name }}</p>
+          </div>
+
+          <!-- 视频通话 -->
+          <template v-else>
+            <!-- 主视频（可切换） -->
+            <video 
+              ref="remoteVideo" 
+              autoplay 
+              playsinline 
+              :class="['main-video', { hidden: isLocalMain }]"
+            ></video>
+            <video 
+              ref="localVideoMain" 
+              autoplay 
+              playsinline 
+              muted 
+              :class="['main-video', { hidden: !isLocalMain }]"
+            ></video>
+
+            <!-- 小窗视频（可点击切换） -->
+            <div class="pip-video-wrapper" @click="toggleVideoPosition">
+              <video 
+                ref="localVideo" 
+                autoplay 
+                playsinline 
+                muted 
+                :class="['pip-video', { hidden: isLocalMain }]"
+              ></video>
+              <video 
+                ref="remoteVideoPip" 
+                autoplay 
+                playsinline 
+                :class="['pip-video', { hidden: !isLocalMain }]"
+              ></video>
+              <div class="pip-switch-hint">
+                <el-icon><Switch /></el-icon>
+              </div>
+            </div>
+
+            <!-- 等待连接时的提示 -->
+            <div class="call-waiting" v-if="!callConnected">
+              <div class="waiting-avatar">
+                <el-avatar :src="getAvatarUrl(currentChat?.other_user_avatar)" :size="100">{{ currentChat?.other_user_name?.[0] }}</el-avatar>
+                <div class="waiting-pulse"></div>
+              </div>
+              <p class="waiting-text">{{ callStatus }}</p>
+            </div>
+          </template>
+        </div>
+
+        <!-- 控制栏 -->
+        <div class="call-controls-bar">
+          <div class="control-btn" :class="{ active: isMuted }" @click="toggleMute">
+            <el-icon :size="24"><MuteNotification v-if="isMuted" /><Microphone v-else /></el-icon>
+            <span>{{ isMuted ? '取消静音' : '静音' }}</span>
+          </div>
+          <div class="control-btn" :class="{ active: isVideoOff }" @click="toggleVideo" v-if="isVideoCall">
+            <el-icon :size="24"><VideoPause v-if="isVideoOff" /><VideoCamera v-else /></el-icon>
+            <span>{{ isVideoOff ? '开启视频' : '关闭视频' }}</span>
+          </div>
+          <div class="control-btn" @click="toggleVideoPosition" v-if="isVideoCall && callConnected">
+            <el-icon :size="24"><Switch /></el-icon>
+            <span>切换画面</span>
+          </div>
+          <div class="control-btn hangup" @click="endCall">
+            <el-icon :size="24"><PhoneFilled /></el-icon>
+            <span>挂断</span>
+          </div>
         </div>
       </div>
-      <template #footer>
-        <div class="call-controls">
-          <el-button :icon="isMuted ? MuteNotification : Bell" circle @click="toggleMute" :title="isMuted ? '取消静音' : '静音'" />
-          <el-button :icon="isVideoOff ? VideoPause : VideoCamera" circle @click="toggleVideo" :title="isVideoOff ? '开启视频' : '关闭视频'" v-if="isVideoCall" />
-          <el-button type="danger" :icon="PhoneFilled" circle @click="endCall" title="挂断" />
-        </div>
-      </template>
     </el-dialog>
 
     <!-- 来电弹窗 -->
-    <el-dialog v-model="showIncomingCall" title="来电" width="400px" :close-on-click-modal="false" :close-on-press-escape="false" class="incoming-call-dialog">
+    <el-dialog v-model="showIncomingCall" :show-close="false" width="380px" :close-on-click-modal="false" :close-on-press-escape="false" class="incoming-call-dialog">
       <div class="incoming-call">
-        <el-avatar :src="getAvatarUrl(incomingCaller?.avatar)" :size="100">{{ incomingCaller?.name?.[0] }}</el-avatar>
-        <p class="caller-name">{{ incomingCaller?.name }}</p>
-        <p class="call-type">{{ incomingCaller?.isVideo ? '视频通话' : '语音通话' }}</p>
-      </div>
-      <template #footer>
-        <div class="incoming-call-actions">
-          <el-button type="danger" :icon="PhoneFilled" circle size="large" @click="rejectCall" />
-          <el-button type="success" :icon="Phone" circle size="large" @click="acceptCall" />
+        <div class="incoming-avatar-wrapper">
+          <el-avatar :src="getAvatarUrl(incomingCaller?.avatar)" :size="100">{{ incomingCaller?.name?.[0] }}</el-avatar>
+          <div class="incoming-pulse"></div>
         </div>
-      </template>
+        <p class="caller-name">{{ incomingCaller?.name }}</p>
+        <p class="call-type">
+          <el-icon v-if="incomingCaller?.isVideo"><VideoCamera /></el-icon>
+          <el-icon v-else><Phone /></el-icon>
+          {{ incomingCaller?.isVideo ? '视频通话' : '语音通话' }}
+        </p>
+      </div>
+      <div class="incoming-call-actions">
+        <div class="action-btn reject" @click="rejectCall">
+          <el-icon :size="28"><PhoneFilled /></el-icon>
+          <span>拒绝</span>
+        </div>
+        <div class="action-btn accept" @click="acceptCall">
+          <el-icon :size="28"><Phone /></el-icon>
+          <span>接听</span>
+        </div>
+      </div>
     </el-dialog>
   </Layout>
 </template>
@@ -241,7 +365,7 @@ import Layout from '@/components/Layout.vue'
 import { ElMessage } from 'element-plus'
 import { 
   Search, VideoCamera, Picture, Folder, Document, Download, Microphone, 
-  Check, ChatDotRound, Phone, PhoneFilled, Film, Bell, MuteNotification, VideoPause
+  Check, ChatDotRound, Phone, PhoneFilled, Film, Bell, MuteNotification, VideoPause, ArrowLeft, Switch
 } from '@element-plus/icons-vue'
 import SimplePeer from 'simple-peer'
 import config from '@/config'
@@ -249,6 +373,9 @@ import config from '@/config'
 const userStore = useUserStore()
 const userId = computed(() => userStore.userInfo?.userId)
 const API_BASE = config.staticUrl
+
+// 移动端视图切换
+const mobileShowChat = ref(false)
 
 // 会话相关
 const conversations = ref([])
@@ -291,13 +418,25 @@ const callStatus = ref('')
 const callConnected = ref(false)
 const incomingCaller = ref(null)
 const localVideo = ref(null)
+const localVideoMain = ref(null)
 const remoteVideo = ref(null)
+const remoteVideoPip = ref(null)
 const isVideoCall = ref(true)
 const isMuted = ref(false)
 const isVideoOff = ref(false)
+const isLocalMain = ref(false) // 是否本地视频为主画面
+const callStartTime = ref(null)
+const callDuration = ref('00:00')
+let callDurationTimer = null
 let peer = null
 let localStream = null
 let incomingSignal = null
+
+// 通话状态文本
+const callStatusText = computed(() => {
+  if (callConnected.value) return '通话中'
+  return callStatus.value
+})
 
 // 工具函数
 const getAvatarUrl = (url) => {
@@ -335,6 +474,33 @@ const formatMsgTime = (time) => {
     return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
   }
   return date.toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+}
+
+// 判断是否显示时间分隔线（间隔超过5分钟）
+const shouldShowTimeDivider = (msg, index) => {
+  if (index === 0) return true
+  const prevMsg = messages.value[index - 1]
+  if (!prevMsg) return true
+  const currTime = new Date(msg.created_at).getTime()
+  const prevTime = new Date(prevMsg.created_at).getTime()
+  return currTime - prevTime > 5 * 60 * 1000 // 5分钟
+}
+
+// 格式化时间分隔线显示
+const formatTimeDivider = (time) => {
+  if (!time) return ''
+  const date = new Date(time)
+  const now = new Date()
+  const isToday = date.toDateString() === now.toDateString()
+  const isYesterday = new Date(now - 86400000).toDateString() === date.toDateString()
+  
+  if (isToday) {
+    return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })
+  }
+  if (isYesterday) {
+    return `昨天 ${date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}`
+  }
+  return date.toLocaleString('zh-CN', { month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
 const formatFileSize = (bytes) => {
@@ -401,6 +567,7 @@ const startChat = (user) => {
   }
   searchKeyword.value = ''
   searchResults.value = []
+  mobileShowChat.value = true // 移动端切换到聊天视图
   loadMessages()
 }
 
@@ -408,6 +575,7 @@ const startChat = (user) => {
 const selectConversation = async (conv) => {
   currentChat.value = conv
   currentPage.value = 1
+  mobileShowChat.value = true // 移动端切换到聊天视图
   await loadMessages()
 }
 
@@ -650,6 +818,9 @@ const initiateCall = async (video) => {
   if (localVideo.value) {
     localVideo.value.srcObject = localStream
   }
+  if (localVideoMain.value) {
+    localVideoMain.value.srcObject = localStream
+  }
   
   // 创建 Peer 连接（作为发起方）
   // 使用 trickle: false 确保一次性发送完整的 offer
@@ -678,8 +849,13 @@ const initiateCall = async (video) => {
     console.log('收到远程视频流')
     callConnected.value = true
     callStatus.value = '通话中'
+    startCallTimer() // 开始计时
     if (remoteVideo.value) {
       remoteVideo.value.srcObject = stream
+    }
+    // 同步到小窗视频
+    if (remoteVideoPip.value) {
+      remoteVideoPip.value.srcObject = stream
     }
   })
   
@@ -723,6 +899,9 @@ const acceptCall = async () => {
   if (localVideo.value) {
     localVideo.value.srcObject = localStream
   }
+  if (localVideoMain.value) {
+    localVideoMain.value.srcObject = localStream
+  }
   
   // 创建 Peer 连接（作为接收方）
   peer = new SimplePeer({
@@ -747,8 +926,13 @@ const acceptCall = async () => {
     console.log('收到远程视频流')
     callConnected.value = true
     callStatus.value = '通话中'
+    startCallTimer() // 开始计时
     if (remoteVideo.value) {
       remoteVideo.value.srcObject = stream
+    }
+    // 同步到小窗视频
+    if (remoteVideoPip.value) {
+      remoteVideoPip.value.srcObject = stream
     }
   })
   
@@ -782,6 +966,9 @@ const endCall = (sendNotification = true) => {
   // 保存需要通知的用户ID
   const otherUserId = currentChat.value?.other_user_id
   
+  // 停止计时
+  stopCallTimer()
+  
   if (peer) {
     peer.destroy()
     peer = null
@@ -802,6 +989,7 @@ const endCall = (sendNotification = true) => {
   callStatus.value = ''
   isMuted.value = false
   isVideoOff.value = false
+  isLocalMain.value = false
   incomingCaller.value = null
   incomingSignal = null
 }
@@ -826,6 +1014,32 @@ const toggleVideo = () => {
       isVideoOff.value = !videoTrack.enabled
     }
   }
+}
+
+// 切换主画面/小窗位置
+const toggleVideoPosition = () => {
+  isLocalMain.value = !isLocalMain.value
+}
+
+// 开始通话计时
+const startCallTimer = () => {
+  callStartTime.value = Date.now()
+  callDurationTimer = setInterval(() => {
+    const elapsed = Math.floor((Date.now() - callStartTime.value) / 1000)
+    const minutes = Math.floor(elapsed / 60).toString().padStart(2, '0')
+    const seconds = (elapsed % 60).toString().padStart(2, '0')
+    callDuration.value = `${minutes}:${seconds}`
+  }, 1000)
+}
+
+// 停止通话计时
+const stopCallTimer = () => {
+  if (callDurationTimer) {
+    clearInterval(callDurationTimer)
+    callDurationTimer = null
+  }
+  callDuration.value = '00:00'
+  callStartTime.value = null
 }
 
 // ==================== WebSocket 事件监听 ====================
@@ -882,6 +1096,20 @@ const setupSocketListeners = () => {
   // 来电 - 在私聊页面直接显示来电弹窗
   socketService.on('incoming_call', (data) => {
     console.log('【私聊页面】收到来电:', data)
+    
+    // 忽略自己发起的通话（防止发起者也收到来电通知）
+    if (data.caller_id === userId.value) {
+      console.log('【私聊页面】忽略自己发起的通话')
+      return
+    }
+    
+    // 如果已经在通话中，拒绝新来电
+    if (showVideoCall.value || peer) {
+      console.log('【私聊页面】已在通话中，自动拒绝新来电')
+      socketService.rejectCall(data.caller_id)
+      return
+    }
+    
     // 标记已在私聊页面处理，防止 App.vue 重复处理
     window.__incomingCallHandled = true
     
@@ -979,26 +1207,36 @@ watch(currentChat, () => {
 </script>
 
 <style scoped>
+/* ==================== 微信风格聊天界面 ==================== */
 .chat-container {
   display: flex;
-  height: calc(100vh - 120px);
-  background: #fff;
-  border-radius: 8px;
+  height: calc(100vh - 180px);
+  background: #f5f5f5;
+  border-radius: 4px;
   overflow: hidden;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  max-height: calc(100vh - 180px);
 }
 
-/* 左侧会话列表 */
+/* 左侧会话列表 - 微信风格 */
 .conversation-list {
-  width: 300px;
-  border-right: 1px solid #e4e7ed;
+  width: 280px;
+  background: #fff;
+  border-right: 1px solid #e0e0e0;
   display: flex;
   flex-direction: column;
+  overflow: hidden;
 }
 
 .search-box {
-  padding: 12px;
-  border-bottom: 1px solid #e4e7ed;
+  padding: 10px;
+  background: #f7f7f7;
+  flex-shrink: 0;
+}
+
+.search-box :deep(.el-input__wrapper) {
+  background: #e7e7e7;
+  border-radius: 4px;
+  box-shadow: none;
 }
 
 .search-results, .conversations {
@@ -1009,33 +1247,39 @@ watch(currentChat, () => {
 .result-item, .conv-item {
   display: flex;
   align-items: center;
-  padding: 12px;
+  padding: 12px 10px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: background 0.15s;
+  border-bottom: 1px solid #f0f0f0;
 }
 
 .result-item:hover, .conv-item:hover {
-  background: #f5f7fa;
+  background: #f3f3f3;
 }
 
 .conv-item.active {
-  background: #ecf5ff;
+  background: #c9c9c9;
 }
 
 .avatar-wrapper {
   position: relative;
-  margin-right: 12px;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+
+.avatar-wrapper :deep(.el-avatar) {
+  border-radius: 4px;
 }
 
 .online-dot {
   position: absolute;
-  bottom: 2px;
-  right: 2px;
-  width: 10px;
-  height: 10px;
-  background: #67c23a;
+  bottom: 0;
+  right: 0;
+  width: 8px;
+  height: 8px;
+  background: #07c160;
   border-radius: 50%;
-  border: 2px solid #fff;
+  border: 1.5px solid #fff;
 }
 
 .conv-info, .user-info {
@@ -1051,18 +1295,19 @@ watch(currentChat, () => {
 }
 
 .conv-info .name, .user-info .name {
-  font-weight: 500;
-  color: #303133;
+  font-size: 14px;
+  color: #191919;
+  font-weight: 400;
 }
 
 .conv-info .time {
-  font-size: 12px;
-  color: #909399;
+  font-size: 11px;
+  color: #b2b2b2;
 }
 
 .last-msg {
-  font-size: 13px;
-  color: #909399;
+  font-size: 12px;
+  color: #b2b2b2;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1071,39 +1316,49 @@ watch(currentChat, () => {
 .user-info .account {
   display: block;
   font-size: 12px;
-  color: #909399;
+  color: #b2b2b2;
 }
 
-.unread-badge {
-  margin-left: 8px;
+.unread-badge :deep(.el-badge__content) {
+  background: #f43530;
+  border: none;
 }
 
 .empty-tip {
   text-align: center;
-  padding: 40px;
-  color: #909399;
+  padding: 40px 20px;
+  color: #b2b2b2;
+  font-size: 13px;
 }
 
-/* 右侧聊天区域 */
+/* 右侧聊天区域 - 微信风格 */
 .chat-area {
   flex: 1;
   display: flex;
   flex-direction: column;
+  background: #f5f5f5;
+  overflow: hidden;
+  min-height: 0;
 }
 
 .chat-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 16px;
-  border-bottom: 1px solid #e4e7ed;
-  background: #fafafa;
+  padding: 15px 20px;
+  background: #ededed;
+  border-bottom: 1px solid #ddd;
+  flex-shrink: 0;
 }
 
 .chat-header .user-info {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 10px;
+}
+
+.chat-header .user-info :deep(.el-avatar) {
+  display: none;
 }
 
 .chat-header .info {
@@ -1112,114 +1367,206 @@ watch(currentChat, () => {
 }
 
 .chat-header .name {
-  font-weight: 600;
-  font-size: 15px;
+  font-size: 16px;
+  color: #191919;
+  font-weight: 500;
 }
 
 .chat-header .status {
   font-size: 12px;
-  color: #909399;
+  color: #b2b2b2;
 }
 
 .chat-header .status.online {
-  color: #67c23a;
+  color: #07c160;
 }
 
 .chat-header .actions {
   display: flex;
-  gap: 8px;
+  gap: 15px;
 }
 
-/* 消息容器 */
+.chat-header .actions .el-button {
+  border: none;
+  background: transparent;
+  color: #5f5f5f;
+  font-size: 18px;
+}
+
+.chat-header .actions .el-button:hover {
+  color: #07c160;
+}
+
+/* 消息容器 - 微信风格 */
 .messages-container {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  background: #f5f5f5;
+  padding: 20px;
+  background: #ededed;
+  min-height: 0;
 }
 
 .load-more {
   text-align: center;
-  padding: 8px;
+  padding: 10px;
 }
 
+.load-more .el-button {
+  color: #576b95;
+  font-size: 12px;
+}
+
+/* 时间分隔 - 微信风格 */
+.time-divider {
+  text-align: center;
+  margin: 20px 0;
+  font-size: 12px;
+  color: #b2b2b2;
+}
+
+/* 消息项布局 */
 .message-item {
   display: flex;
   margin-bottom: 16px;
-  gap: 8px;
+  gap: 10px;
+  align-items: flex-start;
 }
 
 .message-item.mine {
-  flex-direction: row-reverse;
+  justify-content: flex-end;
 }
 
-.message-content {
+/* 头像容器 */
+.avatar-box {
+  flex-shrink: 0;
+}
+
+.avatar-box :deep(.el-avatar) {
+  border-radius: 4px;
+}
+
+/* 消息主体 */
+.message-body {
   max-width: 60%;
   display: flex;
   flex-direction: column;
 }
 
-.message-item.mine .message-content {
+.message-item.mine .message-body {
   align-items: flex-end;
 }
 
+/* 发送者名字 */
+.sender-name {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
+  padding-left: 4px;
+}
+
+/* 气泡容器 */
+.bubble-wrapper {
+  display: flex;
+  align-items: flex-start;
+}
+
+/* 消息气泡 - 微信风格 */
 .bubble {
-  padding: 10px 14px;
-  border-radius: 12px;
+  padding: 10px 12px;
+  border-radius: 4px;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
   word-break: break-word;
+  position: relative;
+  font-size: 14px;
+  line-height: 1.5;
+  color: #191919;
+  max-width: 100%;
+}
+
+/* 气泡小三角 */
+.bubble::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  width: 0;
+  height: 0;
+  border: 6px solid transparent;
+}
+
+.message-item:not(.mine) .bubble::before {
+  left: -10px;
+  border-right-color: #fff;
 }
 
 .message-item.mine .bubble {
-  background: #409eff;
-  color: #fff;
+  background: #95ec69;
+  color: #000;
+}
+
+.message-item.mine .bubble::before {
+  right: -10px;
+  border-left-color: #95ec69;
 }
 
 .bubble.sending {
-  opacity: 0.7;
+  opacity: 0.6;
 }
 
 .bubble.image, .bubble.video {
-  padding: 4px;
+  padding: 0;
   background: transparent;
-  box-shadow: none;
+}
+
+.bubble.image::before, .bubble.video::before {
+  display: none;
 }
 
 .msg-image {
-  max-width: 250px;
-  max-height: 250px;
-  border-radius: 8px;
+  max-width: 200px;
+  max-height: 200px;
+  border-radius: 4px;
   cursor: pointer;
+  display: block;
 }
 
 .msg-video {
-  max-width: 300px;
-  border-radius: 8px;
+  max-width: 260px;
+  border-radius: 4px;
 }
 
+/* 文件消息 - 微信风格 */
 .file-msg {
   display: flex;
   align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  background: #f5f7fa;
-  border-radius: 8px;
+  gap: 12px;
+  padding: 12px;
+  background: #fff;
+  border-radius: 4px;
   cursor: pointer;
-  min-width: 200px;
+  min-width: 220px;
+  max-width: 280px;
+  border: 1px solid #e5e5e5;
 }
 
 .message-item.mine .file-msg {
-  background: rgba(255, 255, 255, 0.2);
+  background: #95ec69;
+  border-color: #7ed956;
 }
 
 .file-icon {
-  font-size: 32px;
-  color: #409eff;
+  font-size: 40px;
+  color: #1989fa;
+  flex-shrink: 0;
+}
+
+/* Word 文档图标颜色 */
+.file-msg.docx .file-icon,
+.file-msg.doc .file-icon {
+  color: #2b5797;
 }
 
 .message-item.mine .file-icon {
-  color: #fff;
+  color: #1a6b1a;
 }
 
 .file-info {
@@ -1230,22 +1577,24 @@ watch(currentChat, () => {
 .file-name {
   display: block;
   font-size: 14px;
+  color: #191919;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  margin-bottom: 4px;
 }
 
 .file-size {
   font-size: 12px;
-  color: #909399;
+  color: #999;
 }
 
 .message-item.mine .file-size {
-  color: rgba(255, 255, 255, 0.8);
+  color: #1a6b1a;
 }
 
 .download-icon {
-  font-size: 20px;
+  display: none;
 }
 
 .voice-msg {
@@ -1254,42 +1603,31 @@ watch(currentChat, () => {
   gap: 8px;
   cursor: pointer;
   min-width: 80px;
+  padding: 8px 12px;
 }
 
 .emoji-content {
-  font-size: 32px;
+  font-size: 28px;
+  line-height: 1;
 }
 
+/* 通话记录 - 微信风格 */
 .call-msg {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 8px 12px;
-  background: #f0f9eb;
-  border-radius: 8px;
-  color: #67c23a;
-  font-size: 13px;
-}
-
-.message-item.mine .call-msg {
-  background: rgba(255, 255, 255, 0.2);
-  color: #fff;
+  padding: 10px 12px;
+  font-size: 14px;
+  color: #191919;
 }
 
 .call-icon {
-  font-size: 18px;
+  font-size: 20px;
+  color: #07c160;
 }
 
 .call-icon.video {
-  color: #409eff;
-}
-
-.call-icon.voice {
-  color: #67c23a;
-}
-
-.message-item.mine .call-icon {
-  color: #fff;
+  color: #07c160;
 }
 
 .msg-meta {
@@ -1297,25 +1635,26 @@ watch(currentChat, () => {
   align-items: center;
   gap: 4px;
   margin-top: 4px;
+  padding: 0 4px;
 }
 
 .msg-meta .time {
   font-size: 11px;
-  color: #909399;
+  color: #b2b2b2;
 }
 
 .read-icon {
   font-size: 12px;
-  color: #67c23a;
+  color: #07c160;
 }
 
 .typing-indicator {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 8px 12px;
-  color: #909399;
-  font-size: 13px;
+  padding: 10px;
+  color: #b2b2b2;
+  font-size: 12px;
 }
 
 .typing-indicator .dots span {
@@ -1335,54 +1674,110 @@ watch(currentChat, () => {
   40% { opacity: 1; }
 }
 
-/* 输入区域 */
+/* 输入区域 - 微信风格 */
 .input-area {
-  border-top: 1px solid #e4e7ed;
-  background: #fff;
+  background: #f5f5f5;
+  border-top: 1px solid #ddd;
+  padding: 10px 15px 15px;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
-.toolbar {
+/* 工具栏行 */
+.toolbar-row {
   display: flex;
-  gap: 4px;
-  padding: 8px 12px;
-  border-bottom: 1px solid #f0f0f0;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 10px;
 }
 
-.toolbar .el-button {
-  padding: 8px;
-}
-
-.input-box {
+.toolbar-left, .toolbar-right {
   display: flex;
-  gap: 12px;
-  padding: 12px;
-  align-items: flex-end;
+  align-items: center;
+  gap: 15px;
 }
 
-.input-box .el-textarea {
-  flex: 1;
+.tool-icon {
+  font-size: 22px;
+  color: #5f5f5f;
+  cursor: pointer;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
-.input-box :deep(.el-textarea__inner) {
+.tool-icon:hover {
+  color: #07c160;
+}
+
+/* 微信风格表情图标 */
+.emoji-icon {
+  width: 24px;
+  height: 24px;
+}
+
+/* 输入框容器 */
+.input-wrapper {
+  margin-bottom: 10px;
+}
+
+.input-wrapper :deep(.el-textarea__inner) {
   resize: none;
-  border-radius: 8px;
+  border: none;
+  border-radius: 0;
+  background: #f5f5f5;
+  padding: 10px 0;
+  font-size: 14px;
+  min-height: 80px !important;
+  box-shadow: none;
+}
+
+.input-wrapper :deep(.el-textarea__inner):focus {
+  box-shadow: none;
+}
+
+/* 发送按钮行 */
+.send-row {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.send-row .el-button {
+  background: #07c160;
+  border-color: #07c160;
+  color: #fff;
+  padding: 8px 20px;
+  font-size: 14px;
+  border-radius: 4px;
+}
+
+.send-row .el-button:hover {
+  background: #06ad56;
+  border-color: #06ad56;
+}
+
+.send-row .el-button:disabled {
+  background: #a0cfb4;
+  border-color: #a0cfb4;
 }
 
 .emoji-picker {
   display: grid;
-  grid-template-columns: repeat(10, 1fr);
-  gap: 4px;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 5px;
   max-height: 200px;
   overflow-y: auto;
+  padding: 5px;
 }
 
 .emoji-item {
-  font-size: 22px;
-  padding: 4px;
+  font-size: 24px;
+  padding: 5px;
   cursor: pointer;
   text-align: center;
   border-radius: 4px;
-  transition: background 0.2s;
+  transition: background 0.15s;
 }
 
 .emoji-item:hover {
@@ -1395,87 +1790,460 @@ watch(currentChat, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #fafafa;
+  background: #ededed;
 }
 
-/* 视频通话 */
+.no-chat :deep(.el-empty__description) {
+  color: #b2b2b2;
+}
+
+/* ==================== 视频/语音通话界面 ==================== */
+.video-call-wrapper {
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+/* 通话头部 */
+.call-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.call-user-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.call-user-detail {
+  display: flex;
+  flex-direction: column;
+}
+
+.call-user-name {
+  color: #fff;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.call-status-text {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+}
+
+.call-timer {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 500;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-variant-numeric: tabular-nums;
+  background: linear-gradient(135deg, rgba(7, 193, 96, 0.2) 0%, rgba(7, 193, 96, 0.1) 100%);
+  padding: 8px 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(7, 193, 96, 0.3);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+.call-timer::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  background: #07c160;
+  border-radius: 50%;
+  animation: pulse-dot 1.5s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(7, 193, 96, 0.6);
+}
+
+@keyframes pulse-dot {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.85);
+  }
+}
+
+/* 视频容器 */
 .video-call-container {
   position: relative;
   width: 100%;
   height: 450px;
-  background: #000;
-  border-radius: 8px;
+  background: #0a0a0a;
   overflow: hidden;
 }
 
-.remote-video {
+.video-call-container.voice-only {
+  height: 300px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #1a1a2e 0%, #0f3460 100%);
+}
+
+/* 语音通话显示 */
+.voice-call-display {
+  text-align: center;
+}
+
+.voice-avatar-wrapper {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 20px;
+}
+
+.voice-avatar-wrapper :deep(.el-avatar) {
+  border: 4px solid rgba(255, 255, 255, 0.2);
+}
+
+.voice-wave {
+  position: absolute;
+  bottom: -10px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 4px;
+}
+
+.voice-wave span {
+  width: 4px;
+  height: 20px;
+  background: #07c160;
+  border-radius: 2px;
+  animation: voiceWave 1s ease-in-out infinite;
+}
+
+.voice-wave span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.voice-wave span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes voiceWave {
+  0%, 100% { height: 8px; }
+  50% { height: 24px; }
+}
+
+.voice-user-name {
+  color: #fff;
+  font-size: 20px;
+  font-weight: 500;
+  margin: 0;
+}
+
+/* 主视频 */
+.main-video {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.local-video {
-  position: absolute;
-  bottom: 16px;
-  right: 16px;
-  width: 150px;
-  height: 112px;
-  border-radius: 8px;
-  object-fit: cover;
-  border: 2px solid #fff;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+.main-video.hidden {
+  display: none;
 }
 
-.call-info {
+/* 小窗视频 (画中画) */
+.pip-video-wrapper {
+  position: absolute;
+  bottom: 20px;
+  right: 20px;
+  width: 180px;
+  height: 135px;
+  border-radius: 12px;
+  overflow: hidden;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  border: 3px solid rgba(255, 255, 255, 0.3);
+}
+
+.pip-video-wrapper:hover {
+  transform: scale(1.05);
+  border-color: #07c160;
+}
+
+.pip-video-wrapper:hover .pip-switch-hint {
+  opacity: 1;
+}
+
+.pip-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.pip-video.hidden {
+  display: none;
+}
+
+.pip-switch-hint {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 40px;
+  height: 40px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+/* 等待连接 */
+.call-waiting {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
   text-align: center;
-  color: #fff;
 }
 
-.call-info p {
-  margin-top: 16px;
+.waiting-avatar {
+  position: relative;
+  display: inline-block;
+}
+
+.waiting-pulse {
+  position: absolute;
+  top: -10px;
+  left: -10px;
+  right: -10px;
+  bottom: -10px;
+  border: 3px solid #07c160;
+  border-radius: 50%;
+  animation: waitingPulse 1.5s ease-out infinite;
+}
+
+@keyframes waitingPulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(1.4);
+    opacity: 0;
+  }
+}
+
+.waiting-text {
+  color: rgba(255, 255, 255, 0.8);
   font-size: 16px;
+  margin-top: 24px;
 }
 
-.call-controls {
+/* 控制栏 */
+.call-controls-bar {
   display: flex;
   justify-content: center;
-  gap: 20px;
+  gap: 24px;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.4);
 }
 
-.call-controls .el-button {
-  width: 50px;
-  height: 50px;
+.control-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
 }
 
-/* 来电弹窗 */
+.control-btn .el-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  transition: all 0.2s;
+}
+
+.control-btn:hover .el-icon {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.control-btn.active .el-icon {
+  background: #f56c6c;
+}
+
+.control-btn span {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+}
+
+.control-btn.hangup .el-icon {
+  background: #f56c6c;
+}
+
+.control-btn.hangup:hover .el-icon {
+  background: #e04848;
+}
+
+/* ==================== 来电弹窗 ==================== */
 .incoming-call {
   text-align: center;
-  padding: 20px;
+  padding: 30px 20px;
+  background: linear-gradient(180deg, #1a1a2e 0%, #16213e 100%);
+  border-radius: 12px;
+}
+
+.incoming-avatar-wrapper {
+  position: relative;
+  display: inline-block;
+  margin-bottom: 20px;
+}
+
+.incoming-avatar-wrapper :deep(.el-avatar) {
+  border: 4px solid rgba(255, 255, 255, 0.2);
+}
+
+.incoming-pulse {
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  right: -15px;
+  bottom: -15px;
+  border: 3px solid #07c160;
+  border-radius: 50%;
+  animation: incomingPulse 1.2s ease-out infinite;
+}
+
+@keyframes incomingPulse {
+  0% {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1.5);
+    opacity: 0;
+  }
 }
 
 .caller-name {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 600;
-  margin: 16px 0 8px;
+  color: #fff;
+  margin: 0 0 8px;
 }
 
 .call-type {
-  color: #909399;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 14px;
 }
 
 .incoming-call-actions {
   display: flex;
   justify-content: center;
-  gap: 40px;
+  gap: 60px;
+  padding: 20px;
+  background: linear-gradient(180deg, #16213e 0%, #1a1a2e 100%);
+  border-radius: 0 0 12px 12px;
 }
 
-.incoming-call-actions .el-button {
-  width: 60px;
-  height: 60px;
+.action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.action-btn:hover {
+  transform: scale(1.1);
+}
+
+.action-btn .el-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.action-btn.reject .el-icon {
+  background: linear-gradient(135deg, #f56c6c 0%, #e04848 100%);
+  transform: rotate(135deg);
+}
+
+.action-btn.accept .el-icon {
+  background: linear-gradient(135deg, #07c160 0%, #06ad56 100%);
+}
+
+.action-btn span {
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+}
+
+/* 对话框样式覆盖 */
+:deep(.video-call-dialog .el-dialog) {
+  background: transparent;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+}
+
+:deep(.video-call-dialog .el-dialog__header) {
+  display: none;
+}
+
+:deep(.video-call-dialog .el-dialog__body) {
+  padding: 0;
+}
+
+:deep(.video-call-dialog .el-dialog__footer) {
+  display: none;
+}
+
+:deep(.incoming-call-dialog .el-dialog) {
+  background: transparent;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  border-radius: 16px;
+}
+
+:deep(.incoming-call-dialog .el-dialog__header) {
+  display: none;
+}
+
+:deep(.incoming-call-dialog .el-dialog__body) {
+  padding: 0;
+}
+
+:deep(.incoming-call-dialog .el-dialog__footer) {
+  display: none;
+}
+
+.incoming-call-actions .el-button--success {
+  background: #07c160;
+  border-color: #07c160;
+}
+
+.incoming-call-actions .el-button--danger {
+  background: #fa5151;
+  border-color: #fa5151;
 }
 
 /* 对话框样式 */
@@ -1485,5 +2253,210 @@ watch(currentChat, () => {
 
 :deep(.incoming-call-dialog .el-dialog__header) {
   text-align: center;
+}
+
+/* 滚动条样式 */
+.conversations::-webkit-scrollbar,
+.messages-container::-webkit-scrollbar {
+  width: 6px;
+}
+
+.conversations::-webkit-scrollbar-thumb,
+.messages-container::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 3px;
+}
+
+.conversations::-webkit-scrollbar-thumb:hover,
+.messages-container::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
+}
+
+/* ==================== 移动端响应式 ==================== */
+@media (max-width: 768px) {
+  .chat-container {
+    flex-direction: column;
+    height: calc(100vh - 130px);
+    max-height: calc(100vh - 130px);
+  }
+  
+  /* 移动端会话列表 */
+  .conversation-list {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e0e0e0;
+    max-height: 100%;
+    display: none;
+  }
+  
+  .conversation-list.show {
+    display: flex;
+  }
+  
+  /* 移动端聊天区域 */
+  .chat-area {
+    display: none;
+    height: 100%;
+  }
+  
+  .chat-area.show {
+    display: flex;
+  }
+  
+  /* 移动端聊天头部 */
+  .chat-header {
+    padding: 10px 12px;
+  }
+  
+  .chat-header .name {
+    font-size: 15px;
+  }
+  
+  .chat-header .actions {
+    gap: 8px;
+  }
+  
+  .chat-header .actions .el-button {
+    font-size: 16px;
+    padding: 6px;
+  }
+  
+  /* 移动端消息区域 */
+  .messages-container {
+    padding: 12px;
+  }
+  
+  .message-body {
+    max-width: 75%;
+  }
+  
+  .bubble {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+  
+  .msg-image {
+    max-width: 160px;
+    max-height: 160px;
+  }
+  
+  .msg-video {
+    max-width: 200px;
+  }
+  
+  .file-msg {
+    min-width: 180px;
+    max-width: 220px;
+    padding: 10px;
+  }
+  
+  /* 移动端输入区域 */
+  .input-area {
+    padding: 8px 10px 12px;
+  }
+  
+  .toolbar-row {
+    padding-bottom: 8px;
+  }
+  
+  .toolbar-left, .toolbar-right {
+    gap: 12px;
+  }
+  
+  .tool-icon {
+    font-size: 20px;
+  }
+  
+  .input-wrapper :deep(.el-textarea__inner) {
+    min-height: 60px !important;
+    font-size: 14px;
+  }
+  
+  .send-row .el-button {
+    padding: 6px 16px;
+    font-size: 13px;
+  }
+  
+  /* 移动端表情选择器 */
+  .emoji-picker {
+    grid-template-columns: repeat(6, 1fr);
+  }
+  
+  .emoji-item {
+    font-size: 20px;
+    padding: 4px;
+  }
+  
+  /* 移动端无聊天选中 */
+  .no-chat {
+    display: none;
+  }
+  
+  /* 移动端视频通话 */
+  .video-call-container {
+    height: 280px;
+  }
+  
+  .video-call-container.voice-only {
+    height: 220px;
+  }
+  
+  .pip-video-wrapper {
+    width: 120px;
+    height: 90px;
+    bottom: 12px;
+    right: 12px;
+  }
+  
+  .call-controls-bar {
+    gap: 16px;
+    padding: 16px;
+  }
+  
+  .control-btn .el-icon {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .control-btn span {
+    font-size: 11px;
+  }
+  
+  .incoming-call-actions {
+    gap: 50px;
+    padding: 16px;
+  }
+  
+  .action-btn .el-icon {
+    width: 56px;
+    height: 56px;
+  }
+  
+  :deep(.video-call-dialog .el-dialog) {
+    width: 95% !important;
+    margin: 10px auto;
+  }
+  
+  :deep(.incoming-call-dialog .el-dialog) {
+    width: 90% !important;
+  }
+}
+
+/* 移动端返回按钮 */
+.mobile-back-btn {
+  display: none;
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #1f2328;
+  margin-right: 8px;
+}
+
+@media (max-width: 768px) {
+  .mobile-back-btn {
+    display: flex;
+    align-items: center;
+  }
 }
 </style>

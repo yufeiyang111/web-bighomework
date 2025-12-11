@@ -16,37 +16,63 @@ class ChatbotService:
     def search_learning_materials(query, limit=3):
         """
         搜索学习资料库
-        简单的关键词匹配搜索
+        增强的关键词匹配搜索，支持优先级
         """
         sql = """
-            SELECT title, content, category, tags 
+            SELECT material_id, title, content, category, tags, 
+                   CASE 
+                       WHEN title LIKE %s THEN 3
+                       WHEN tags LIKE %s THEN 2
+                       WHEN content LIKE %s THEN 1
+                       ELSE 0
+                   END as relevance_score
             FROM learning_materials 
             WHERE title LIKE %s OR content LIKE %s OR tags LIKE %s
+            ORDER BY relevance_score DESC, created_at DESC
             LIMIT %s
         """
         search_pattern = f'%{query}%'
         results = Database.execute_query(
             sql, 
-            (search_pattern, search_pattern, search_pattern, limit),
+            (search_pattern, search_pattern, search_pattern, 
+             search_pattern, search_pattern, search_pattern, limit),
             fetch_all=True
         )
         return results or []
     
     @staticmethod
-    def build_context_prompt(user_question, materials):
+    def build_context_prompt(user_question, materials, force_knowledge=False):
         """
         构建包含学习资料的提示词
+        
+        Args:
+            user_question: 用户问题
+            materials: 匹配的资料列表
+            force_knowledge: 是否强制使用知识库回答（高相关度时）
         """
         if not materials:
-            return user_question
+            return user_question, False
         
-        context = "以下是相关的学习资料：\n\n"
-        for i, material in enumerate(materials, 1):
-            context += f"{i}. {material['title']}\n"
-            context += f"   {material['content']}\n\n"
+        # 检查是否有高相关度的资料（relevance_score >= 3，即标题完全匹配）
+        has_high_relevance = any(m.get('relevance_score', 0) >= 3 for m in materials)
         
-        context += f"基于以上学习资料，请回答：{user_question}"
-        return context
+        if has_high_relevance or force_knowledge:
+            # 高相关度：直接使用知识库内容，不让AI随意发挥
+            context = "请严格基于以下知识库内容回答，不要添加知识库中没有的信息：\n\n"
+            for i, material in enumerate(materials, 1):
+                context += f"{i}. {material['title']}\n"
+                context += f"   {material['content']}\n\n"
+            context += f"\n问题：{user_question}\n"
+            context += "请仅使用上述资料回答，如果资料不足以回答问题，请明确说明。"
+            return context, True
+        else:
+            # 低相关度：提供参考资料，但允许AI补充
+            context = "以下是可能相关的参考资料：\n\n"
+            for i, material in enumerate(materials, 1):
+                context += f"{i}. {material['title']}\n"
+                context += f"   {material['content']}\n\n"
+            context += f"\n参考以上资料回答问题：{user_question}"
+            return context, False
     
     @staticmethod
     def call_tongyi_api(messages, api_key=None):
@@ -190,10 +216,11 @@ class ChatbotService:
         
         # 如果启用知识库，搜索相关资料
         context_message = user_message
+        used_knowledge_base = False
         if use_knowledge_base:
             materials = ChatbotService.search_learning_materials(user_message)
             if materials:
-                context_message = ChatbotService.build_context_prompt(user_message, materials)
+                context_message, used_knowledge_base = ChatbotService.build_context_prompt(user_message, materials)
         
         # 添加历史消息（最近的几条）
         for msg in history[:-1]:  # 排除刚保存的用户消息
@@ -224,3 +251,118 @@ class ChatbotService:
                 'success': False,
                 'message': result['message']
             }
+    
+    @staticmethod
+    def get_all_materials(category=None, page=1, page_size=20):
+        """
+        获取所有学习资料（分页）
+        """
+        offset = (page - 1) * page_size
+        
+        if category:
+            sql = """
+                SELECT m.*, u.real_name as creator_name
+                FROM learning_materials m
+                LEFT JOIN users u ON m.created_by = u.user_id
+                WHERE m.category = %s
+                ORDER BY m.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            materials = Database.execute_query(sql, (category, page_size, offset), fetch_all=True)
+            
+            count_sql = "SELECT COUNT(*) as total FROM learning_materials WHERE category = %s"
+            count_result = Database.execute_query(count_sql, (category,), fetch_one=True)
+        else:
+            sql = """
+                SELECT m.*, u.real_name as creator_name
+                FROM learning_materials m
+                LEFT JOIN users u ON m.created_by = u.user_id
+                ORDER BY m.created_at DESC
+                LIMIT %s OFFSET %s
+            """
+            materials = Database.execute_query(sql, (page_size, offset), fetch_all=True)
+            
+            count_sql = "SELECT COUNT(*) as total FROM learning_materials"
+            count_result = Database.execute_query(count_sql, fetch_one=True)
+        
+        total = count_result['total'] if count_result else 0
+        
+        return {
+            'materials': materials or [],
+            'total': total,
+            'page': page,
+            'page_size': page_size
+        }
+    
+    @staticmethod
+    def add_material(title, content, category, tags, created_by):
+        """
+        添加学习资料
+        """
+        sql = """
+            INSERT INTO learning_materials (title, content, category, tags, created_by)
+            VALUES (%s, %s, %s, %s, %s)
+        """
+        try:
+            material_id = Database.execute_query(
+                sql, 
+                (title, content, category, tags, created_by),
+                commit=True
+            )
+            return {'success': True, 'material_id': material_id, 'message': '资料添加成功'}
+        except Exception as e:
+            return {'success': False, 'message': f'添加失败: {str(e)}'}
+    
+    @staticmethod
+    def update_material(material_id, title, content, category, tags):
+        """
+        更新学习资料
+        """
+        sql = """
+            UPDATE learning_materials 
+            SET title = %s, content = %s, category = %s, tags = %s
+            WHERE material_id = %s
+        """
+        try:
+            Database.execute_query(
+                sql,
+                (title, content, category, tags, material_id),
+                commit=True
+            )
+            return {'success': True, 'message': '资料更新成功'}
+        except Exception as e:
+            return {'success': False, 'message': f'更新失败: {str(e)}'}
+    
+    @staticmethod
+    def delete_material(material_id):
+        """
+        删除学习资料
+        """
+        sql = "DELETE FROM learning_materials WHERE material_id = %s"
+        try:
+            Database.execute_query(sql, (material_id,), commit=True)
+            return {'success': True, 'message': '资料删除成功'}
+        except Exception as e:
+            return {'success': False, 'message': f'删除失败: {str(e)}'}
+    
+    @staticmethod
+    def get_material_by_id(material_id):
+        """
+        根据ID获取资料详情
+        """
+        sql = """
+            SELECT m.*, u.real_name as creator_name
+            FROM learning_materials m
+            LEFT JOIN users u ON m.created_by = u.user_id
+            WHERE m.material_id = %s
+        """
+        return Database.execute_query(sql, (material_id,), fetch_one=True)
+    
+    @staticmethod
+    def get_categories():
+        """
+        获取所有分类
+        """
+        sql = "SELECT DISTINCT category FROM learning_materials WHERE category IS NOT NULL ORDER BY category"
+        results = Database.execute_query(sql, fetch_all=True)
+        return [r['category'] for r in results] if results else []

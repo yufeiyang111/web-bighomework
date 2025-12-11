@@ -43,6 +43,11 @@ export default defineConfig({
         target: BACKEND_URL,
         changeOrigin: true,
         secure: false  // 允许自签名证书
+      },
+      '/uploads': {
+        target: BACKEND_URL,
+        changeOrigin: true,
+        secure: false  // 允许自签名证书
       }
     }
   }

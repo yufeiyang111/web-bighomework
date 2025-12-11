@@ -486,6 +486,52 @@ class FaceService:
         return 1 - similarity
     
     @staticmethod
+    def detect_all_faces(img):
+        """检测图片中的所有人脸并提取特征向量
+        
+        Args:
+            img: OpenCV 格式的图片 (numpy array, BGR)
+        
+        Returns:
+            list: 所有检测到的人脸特征向量列表
+        """
+        try:
+            DeepFace = get_deepface()
+            import cv2
+            
+            # 转换为 RGB
+            img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            
+            # 保存临时文件（DeepFace 需要文件路径）
+            import tempfile
+            with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as tmp:
+                tmp_path = tmp.name
+                cv2.imwrite(tmp_path, img)
+            
+            try:
+                # 提取所有人脸的特征
+                embedding_objs = DeepFace.represent(
+                    img_path=tmp_path,
+                    model_name=FaceService.MODEL_NAME,
+                    enforce_detection=False,  # 不强制检测，允许检测多张脸
+                    detector_backend=FaceService.DETECTOR_BACKEND
+                )
+                
+                embeddings = [obj['embedding'] for obj in embedding_objs if obj.get('embedding')]
+                print(f'[detect_all_faces] 检测到 {len(embeddings)} 张人脸')
+                return embeddings
+            finally:
+                # 删除临时文件
+                if os.path.exists(tmp_path):
+                    os.remove(tmp_path)
+                    
+        except Exception as e:
+            print(f'[detect_all_faces] 检测失败: {e}')
+            import traceback
+            traceback.print_exc()
+            return []
+    
+    @staticmethod
     def has_face_registered(user_id):
         """检查用户是否已注册人脸"""
         sql = "SELECT face_id FROM user_faces WHERE user_id = %s"

@@ -292,6 +292,12 @@ def handle_call_user(data):
         'is_video': is_video
     }
     
+    # 确保不会发送给发起者自己
+    if caller_id == int(receiver_id):
+        print(f'[通话] 错误: 不能呼叫自己')
+        emit('call_rejected', {'reason': '不能呼叫自己'})
+        return
+    
     target_room = f'user_{receiver_id}'
     print(f'[通话] 发送 incoming_call 事件到房间: {target_room}')
     print(f'[通话] 通话数据: caller_id={caller_id}, caller_name={caller["real_name"]}')
@@ -422,3 +428,167 @@ def send_to_user(user_id, event, data):
 def get_online_users():
     """获取所有在线用户"""
     return list(connected_users.keys())
+
+
+# ==================== 群聊 WebSocket 事件 ====================
+
+@socketio.on('join_group')
+def handle_join_group(data):
+    """加入群聊房间"""
+    sid = request.sid
+    user_id = get_user_id_from_sid(sid)
+    group_id = data.get('group_id')
+    
+    if not user_id or not group_id:
+        return
+    
+    # 验证用户是否是群成员
+    from database import Database
+    sql = "SELECT id FROM group_members WHERE group_id = %s AND user_id = %s"
+    member = Database.execute_query(sql, (group_id, user_id), fetch_one=True)
+    
+    if member:
+        room_name = f'group_{group_id}'
+        join_room(room_name)
+        print(f'[群聊] 用户 {user_id} 加入群聊房间: {room_name}')
+        emit('joined_group', {'group_id': group_id})
+
+
+@socketio.on('leave_group_room')
+def handle_leave_group_room(data):
+    """离开群聊房间"""
+    group_id = data.get('group_id')
+    if group_id:
+        room_name = f'group_{group_id}'
+        leave_room(room_name)
+        print(f'[群聊] 用户离开群聊房间: {room_name}')
+
+
+@socketio.on('send_group_message')
+def handle_send_group_message(data):
+    """发送群消息"""
+    sid = request.sid
+    sender_id = get_user_id_from_sid(sid)
+    
+    if not sender_id:
+        emit('error', {'message': '未认证'})
+        return
+    
+    group_id = data.get('group_id')
+    message_type = data.get('message_type', 'text')
+    content = data.get('content')
+    
+    if not group_id or not content:
+        emit('error', {'message': '缺少必要参数'})
+        return
+    
+    from database import Database
+    from datetime import datetime, timedelta
+    import hashlib
+    import uuid
+    
+    # 验证用户是否是群成员
+    sql = "SELECT role, is_muted FROM group_members WHERE group_id = %s AND user_id = %s"
+    member = Database.execute_query(sql, (group_id, sender_id), fetch_one=True)
+    
+    if not member:
+        emit('error', {'message': '您不是该群成员'})
+        return
+    
+    if member['is_muted']:
+        emit('error', {'message': '您已被禁言'})
+        return
+    
+    checkin_id = None
+    checkin_code = None
+    
+    # 如果是签到消息，先创建签到记录
+    if message_type == 'checkin':
+        # 验证是否是管理员或群主
+        if member['role'] not in ('owner', 'admin'):
+            emit('error', {'message': '只有群主或管理员可以发起签到'})
+            return
+        
+        checkin_type = data.get('checkin_type', 'qrcode')
+        duration = data.get('duration', 5)
+        gesture_number = data.get('gesture_number')
+        location_lat = data.get('location_lat')
+        location_lng = data.get('location_lng')
+        location_range = data.get('location_range', 50)
+        
+        # 生成签到码
+        checkin_code = hashlib.md5(f"{uuid.uuid4()}{datetime.now().timestamp()}".encode()).hexdigest()[:8].upper()
+        end_time = datetime.now() + timedelta(minutes=duration)
+        
+        # 创建签到记录
+        sql = """
+            INSERT INTO checkins (group_id, creator_id, title, type, checkin_code, 
+                                  duration, end_time, description, gesture_number,
+                                  location_lat, location_lng, location_range, status)
+            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, 'active')
+        """
+        checkin_id = Database.execute_query(sql, (
+            group_id, sender_id, content, checkin_type, checkin_code,
+            duration, end_time, '', gesture_number,
+            location_lat, location_lng, location_range
+        ), commit=True)
+        
+        print(f'[群聊签到] 创建签到: ID={checkin_id}, 类型={checkin_type}, 时长={duration}分钟')
+    
+    # 保存消息
+    if checkin_id:
+        sql = """
+            INSERT INTO group_messages (group_id, sender_id, message_type, content, reference_id, reference_type)
+            VALUES (%s, %s, %s, %s, %s, 'checkin')
+        """
+        message_id = Database.execute_query(sql, (group_id, sender_id, message_type, content, checkin_id), commit=True)
+    else:
+        sql = """
+            INSERT INTO group_messages (group_id, sender_id, message_type, content)
+            VALUES (%s, %s, %s, %s)
+        """
+        message_id = Database.execute_query(sql, (group_id, sender_id, message_type, content), commit=True)
+    
+    # 获取发送者信息
+    sql = "SELECT real_name, photo_url FROM users WHERE user_id = %s"
+    sender = Database.execute_query(sql, (sender_id,), fetch_one=True)
+    
+    # 获取消息时间
+    sql = "SELECT created_at FROM group_messages WHERE id = %s"
+    msg = Database.execute_query(sql, (message_id,), fetch_one=True)
+    
+    message_data = {
+        'id': message_id,
+        'group_id': group_id,
+        'sender_id': sender_id,
+        'sender_name': sender['real_name'],
+        'sender_avatar': sender['photo_url'],
+        'message_type': message_type,
+        'content': content,
+        'created_at': msg['created_at'].isoformat() if msg else None,
+        'reference_id': checkin_id,
+        'checkin_code': checkin_code
+    }
+    
+    # 广播到群聊房间
+    room_name = f'group_{group_id}'
+    socketio.emit('new_group_message', message_data, room=room_name)
+    print(f'[群聊] 消息发送: 用户 {sender_id} -> 群 {group_id}')
+
+
+def broadcast_to_group(group_id, event, data, exclude_user=None):
+    """广播消息到群组所有成员"""
+    room_name = f'group_{group_id}'
+    socketio.emit(event, data, room=room_name)
+
+
+def notify_group_members(group_id, event, data):
+    """通知群组成员（即使不在群聊房间）"""
+    from database import Database
+    sql = "SELECT user_id FROM group_members WHERE group_id = %s"
+    members = Database.execute_query(sql, (group_id,), fetch_all=True)
+    
+    for member in members:
+        user_id = member['user_id']
+        if user_id in connected_users:
+            socketio.emit(event, data, room=f'user_{user_id}')

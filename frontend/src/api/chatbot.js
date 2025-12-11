@@ -70,3 +70,66 @@ export function searchMaterials(query, limit = 10) {
     params: { q: query, limit }
   })
 }
+
+/**
+ * 获取知识库列表（分页）
+ */
+export function getKnowledgeBase(params) {
+  return request({
+    url: '/chatbot/knowledge-base',
+    method: 'get',
+    params
+  })
+}
+
+/**
+ * 添加知识库条目
+ */
+export function addKnowledge(data) {
+  return request({
+    url: '/chatbot/knowledge-base',
+    method: 'post',
+    data
+  })
+}
+
+/**
+ * 获取知识库条目详情
+ */
+export function getKnowledgeDetail(materialId) {
+  return request({
+    url: `/chatbot/knowledge-base/${materialId}`,
+    method: 'get'
+  })
+}
+
+/**
+ * 更新知识库条目
+ */
+export function updateKnowledge(materialId, data) {
+  return request({
+    url: `/chatbot/knowledge-base/${materialId}`,
+    method: 'put',
+    data
+  })
+}
+
+/**
+ * 删除知识库条目
+ */
+export function deleteKnowledge(materialId) {
+  return request({
+    url: `/chatbot/knowledge-base/${materialId}`,
+    method: 'delete'
+  })
+}
+
+/**
+ * 获取所有分类
+ */
+export function getCategories() {
+  return request({
+    url: '/chatbot/categories',
+    method: 'get'
+  })
+}

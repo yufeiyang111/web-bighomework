@@ -16,6 +16,8 @@ from face_service import FaceService
 from message_service import MessageService
 from websocket_server import socketio, init_socketio
 from models import db
+from group_chat_service import group_chat_bp
+from checkin_service import checkin_bp
 
 app = Flask(__name__)
 
@@ -55,6 +57,10 @@ CORS(app,
 
 # 初始化JWT
 jwt = JWTManager(app)
+
+# 注册蓝图
+app.register_blueprint(group_chat_bp, url_prefix='/api/group-chat')
+app.register_blueprint(checkin_bp, url_prefix='/api/checkin')
 
 # JWT错误处理 - 将422错误改为401
 @jwt.invalid_token_loader
@@ -618,6 +624,141 @@ def search_materials():
     except Exception as e:
         return jsonify({'success': False, 'message': str(e)}), 500
 
+@app.route('/api/chatbot/knowledge-base', methods=['GET'])
+@jwt_required()
+def get_knowledge_base():
+    """获取知识库列表（分页）"""
+    try:
+        category = request.args.get('category')
+        page = int(request.args.get('page', 1))
+        page_size = int(request.args.get('pageSize', 20))
+        
+        result = ChatbotService.get_all_materials(category, page, page_size)
+        
+        # 转换时间格式
+        for material in result['materials']:
+            if 'created_at' in material and material['created_at']:
+                if hasattr(material['created_at'], 'strftime'):
+                    material['created_at'] = material['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+            if 'updated_at' in material and material['updated_at']:
+                if hasattr(material['updated_at'], 'strftime'):
+                    material['updated_at'] = material['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        return jsonify({
+            'success': True,
+            **result
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/chatbot/knowledge-base', methods=['POST'])
+@jwt_required()
+def add_knowledge():
+    """添加知识库条目（仅教师和管理员）"""
+    try:
+        user_id = int(get_jwt_identity())
+        claims = get_jwt()
+        role = claims.get('role')
+        
+        if role not in ['teacher', 'admin']:
+            return jsonify({'success': False, 'message': '只有教师和管理员可以添加知识库'}), 403
+        
+        data = request.get_json()
+        title = data.get('title')
+        content = data.get('content')
+        category = data.get('category', '')
+        tags = data.get('tags', '')
+        
+        if not all([title, content]):
+            return jsonify({'success': False, 'message': '标题和内容不能为空'}), 400
+        
+        result = ChatbotService.add_material(title, content, category, tags, user_id)
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/chatbot/knowledge-base/<int:material_id>', methods=['GET'])
+@jwt_required()
+def get_knowledge_detail(material_id):
+    """获取知识库条目详情"""
+    try:
+        material = ChatbotService.get_material_by_id(material_id)
+        
+        if not material:
+            return jsonify({'success': False, 'message': '资料不存在'}), 404
+        
+        # 转换时间格式
+        if 'created_at' in material and material['created_at']:
+            if hasattr(material['created_at'], 'strftime'):
+                material['created_at'] = material['created_at'].strftime('%Y-%m-%d %H:%M:%S')
+        if 'updated_at' in material and material['updated_at']:
+            if hasattr(material['updated_at'], 'strftime'):
+                material['updated_at'] = material['updated_at'].strftime('%Y-%m-%d %H:%M:%S')
+        
+        return jsonify({
+            'success': True,
+            'material': material
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/chatbot/knowledge-base/<int:material_id>', methods=['PUT'])
+@jwt_required()
+def update_knowledge(material_id):
+    """更新知识库条目（仅教师和管理员）"""
+    try:
+        claims = get_jwt()
+        role = claims.get('role')
+        
+        if role not in ['teacher', 'admin']:
+            return jsonify({'success': False, 'message': '只有教师和管理员可以编辑知识库'}), 403
+        
+        data = request.get_json()
+        title = data.get('title')
+        content = data.get('content')
+        category = data.get('category', '')
+        tags = data.get('tags', '')
+        
+        if not all([title, content]):
+            return jsonify({'success': False, 'message': '标题和内容不能为空'}), 400
+        
+        result = ChatbotService.update_material(material_id, title, content, category, tags)
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/chatbot/knowledge-base/<int:material_id>', methods=['DELETE'])
+@jwt_required()
+def delete_knowledge(material_id):
+    """删除知识库条目（仅教师和管理员）"""
+    try:
+        claims = get_jwt()
+        role = claims.get('role')
+        
+        if role not in ['teacher', 'admin']:
+            return jsonify({'success': False, 'message': '只有教师和管理员可以删除知识库'}), 403
+        
+        result = ChatbotService.delete_material(material_id)
+        return jsonify(result)
+    
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
+@app.route('/api/chatbot/categories', methods=['GET'])
+@jwt_required()
+def get_categories():
+    """获取所有分类"""
+    try:
+        categories = ChatbotService.get_categories()
+        return jsonify({
+            'success': True,
+            'categories': categories
+        })
+    except Exception as e:
+        return jsonify({'success': False, 'message': str(e)}), 500
+
 # ==================== 学生花名册管理路由 ====================
 
 @app.route('/api/roster/add-student', methods=['POST'])
@@ -1025,6 +1166,11 @@ def get_online_status():
 def serve_message_file(filename):
     return send_from_directory('uploads/messages', filename)
 
+# 静态文件服务（签到人脸截图）
+@app.route('/uploads/checkin_faces/<path:filename>')
+def serve_checkin_face(filename):
+    return send_from_directory('uploads/checkin_faces', filename)
+
 if __name__ == '__main__':
     import os
     import ssl
@@ -1032,8 +1178,9 @@ if __name__ == '__main__':
     if not os.path.exists(Config.UPLOAD_FOLDER):
         os.makedirs(Config.UPLOAD_FOLDER)
     
-    # 创建消息上传目录
+    # 创建上传目录
     os.makedirs('uploads/messages', exist_ok=True)
+    os.makedirs('uploads/checkin_faces', exist_ok=True)
     
     # 初始化 WebSocket
     init_socketio(app)

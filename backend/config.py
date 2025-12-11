@@ -48,3 +48,6 @@ class Config:
     AI_API_KEY = os.getenv('AI_API_KEY', '')
     AI_MODEL = os.getenv('AI_MODEL', 'deepseek-v3.2-exp')
     AI_BASE_URL = os.getenv('AI_BASE_URL', 'https://dashscope.aliyuncs.com/compatible-mode/v1')
+    
+    # 前端URL配置（用于生成二维码等）
+    FRONTEND_URL = os.getenv('FRONTEND_URL', 'https://192.168.95.32:3000')

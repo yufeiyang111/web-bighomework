@@ -1,17 +1,23 @@
 <template>
-  <div class="app-layout">
+  <div class="app-layout" :class="{ 'mobile': isMobile }">
     <!-- 顶部导航栏 -->
     <header class="top-nav">
       <div class="nav-container">
         <div class="nav-left">
+          <!-- 移动端菜单按钮 -->
+          <button class="mobile-menu-btn" @click="showMobileMenu = true" v-if="isMobile">
+            <el-icon :size="24"><Menu /></el-icon>
+          </button>
+          
           <router-link to="/dashboard" class="logo">
             <svg height="24" viewBox="0 0 24 24" width="24" fill="currentColor">
               <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
             </svg>
-            <span>教育系统</span>
+            <span class="logo-text">教育系统</span>
           </router-link>
           
-          <nav class="nav-menu">
+          <!-- 桌面端导航菜单 -->
+          <nav class="nav-menu" v-if="!isMobile">
             <router-link to="/dashboard" :class="['nav-link', { active: isActive('/dashboard') }]">
               首页
             </router-link>
@@ -111,7 +117,7 @@
               <div class="user-avatar">
                 {{ userStore.userInfo?.realName?.[0] || userStore.userInfo?.email?.[0] || 'U' }}
               </div>
-              <el-icon class="dropdown-caret"><ArrowDown /></el-icon>
+              <el-icon class="dropdown-caret" v-if="!isMobile"><ArrowDown /></el-icon>
             </div>
             <template #dropdown>
               <el-dropdown-menu>
@@ -127,6 +133,78 @@
         </div>
       </div>
     </header>
+
+    <!-- 移动端侧边菜单 -->
+    <el-drawer v-model="showMobileMenu" direction="ltr" size="280px" :show-close="false" class="mobile-drawer">
+      <template #header>
+        <div class="drawer-header">
+          <div class="drawer-user">
+            <div class="drawer-avatar">{{ userStore.userInfo?.realName?.[0] || 'U' }}</div>
+            <div class="drawer-info">
+              <span class="drawer-name">{{ userStore.userInfo?.realName || '用户' }}</span>
+              <span class="drawer-role">{{ roleText }}</span>
+            </div>
+          </div>
+        </div>
+      </template>
+      <div class="mobile-menu">
+        <div class="menu-item" @click="mobileNav('/dashboard')">
+          <el-icon><HomeFilled /></el-icon>
+          <span>首页</span>
+        </div>
+        <div class="menu-group">
+          <div class="menu-group-title">消息</div>
+          <div class="menu-item" @click="mobileNav('/messages/private')">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>私信</span>
+          </div>
+          <div class="menu-item" @click="mobileNav('/messages/group')">
+            <el-icon><UserFilled /></el-icon>
+            <span>群聊</span>
+          </div>
+          <div class="menu-item" @click="mobileNav('/messages/notifications')">
+            <el-icon><Bell /></el-icon>
+            <span>通知公告</span>
+          </div>
+        </div>
+        <div class="menu-group" v-if="userStore.hasRole('teacher') || userStore.hasRole('admin')">
+          <div class="menu-group-title">签到管理</div>
+          <div class="menu-item" @click="mobileNav('/checkin/manage')">
+            <el-icon><List /></el-icon>
+            <span>签到管理</span>
+          </div>
+          <div class="menu-item" @click="mobileNav('/checkin/create')">
+            <el-icon><Plus /></el-icon>
+            <span>发布签到</span>
+          </div>
+        </div>
+        <div class="menu-item" v-if="userStore.hasRole('student')" @click="mobileNav('/checkin/student')">
+          <el-icon><Check /></el-icon>
+          <span>签到</span>
+        </div>
+        <div class="menu-item" @click="mobileNav('/chatbot')">
+          <el-icon><Service /></el-icon>
+          <span>AI助教</span>
+        </div>
+        <div class="menu-item" v-if="userStore.hasRole('teacher')" @click="mobileNav('/student-roster')">
+          <el-icon><User /></el-icon>
+          <span>学生管理</span>
+        </div>
+        <div class="menu-item" v-if="userStore.hasRole('admin')" @click="mobileNav('/admin')">
+          <el-icon><Setting /></el-icon>
+          <span>管理中心</span>
+        </div>
+        <div class="menu-divider"></div>
+        <div class="menu-item" @click="mobileNav('/profile')">
+          <el-icon><UserFilled /></el-icon>
+          <span>个人设置</span>
+        </div>
+        <div class="menu-item logout" @click="handleLogout">
+          <el-icon><SwitchButton /></el-icon>
+          <span>退出登录</span>
+        </div>
+      </div>
+    </el-drawer>
     
     <!-- 页面标题栏 -->
     <div class="page-header" v-if="pageTitle">
@@ -145,11 +223,14 @@
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '@/stores/user'
 import { ElMessageBox } from 'element-plus'
-import { ArrowDown, Bell } from '@element-plus/icons-vue'
+import { 
+  ArrowDown, Bell, Menu, HomeFilled, ChatDotRound, UserFilled, 
+  List, Plus, Check, Service, User, Setting, SwitchButton 
+} from '@element-plus/icons-vue'
 
 const props = defineProps({
   pageTitle: {
@@ -161,6 +242,23 @@ const props = defineProps({
 const route = useRoute()
 const router = useRouter()
 const userStore = useUserStore()
+
+// 响应式检测
+const isMobile = ref(false)
+const showMobileMenu = ref(false)
+
+const checkMobile = () => {
+  isMobile.value = window.innerWidth < 768
+}
+
+onMounted(() => {
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
+})
 
 // 未读消息数（后续接入API）
 const unreadCount = ref(0)
@@ -179,16 +277,26 @@ const handleNav = (path) => {
   router.push(path)
 }
 
+const mobileNav = (path) => {
+  showMobileMenu.value = false
+  router.push(path)
+}
+
+const handleLogout = () => {
+  showMobileMenu.value = false
+  ElMessageBox.confirm('确定要退出登录吗？', '提示', {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消',
+    type: 'warning'
+  }).then(async () => {
+    await userStore.logoutAction()
+    router.push('/login')
+  }).catch(() => {})
+}
+
 const handleCommand = (command) => {
   if (command === 'logout') {
-    ElMessageBox.confirm('确定要退出登录吗？', '提示', {
-      confirmButtonText: '确定',
-      cancelButtonText: '取消',
-      type: 'warning'
-    }).then(async () => {
-      await userStore.logoutAction()
-      router.push('/login')
-    }).catch(() => {})
+    handleLogout()
   } else if (command === 'profile') {
     router.push('/profile')
   }
@@ -223,6 +331,20 @@ const handleCommand = (command) => {
   display: flex;
   align-items: center;
   gap: 24px;
+}
+
+.mobile-menu-btn {
+  display: none;
+  background: none;
+  border: none;
+  padding: 8px;
+  cursor: pointer;
+  color: #1f2328;
+  border-radius: 6px;
+}
+
+.mobile-menu-btn:hover {
+  background: #f6f8fa;
 }
 
 .logo {
@@ -371,5 +493,153 @@ const handleCommand = (command) => {
   max-width: 1400px;
   margin: 0 auto;
   padding: 0 24px;
+}
+
+/* ========== 移动端侧边菜单样式 ========== */
+.drawer-header {
+  padding: 0;
+}
+
+.drawer-user {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.drawer-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 20px;
+}
+
+.drawer-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.drawer-name {
+  font-weight: 600;
+  font-size: 16px;
+  color: #1f2328;
+}
+
+.drawer-role {
+  font-size: 12px;
+  color: #656d76;
+}
+
+.mobile-menu {
+  padding: 8px 0;
+}
+
+.menu-group {
+  margin-bottom: 8px;
+}
+
+.menu-group-title {
+  padding: 12px 20px 8px;
+  font-size: 12px;
+  color: #909399;
+  font-weight: 500;
+}
+
+.menu-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 20px;
+  color: #1f2328;
+  font-size: 15px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.menu-item:hover {
+  background: #f6f8fa;
+}
+
+.menu-item:active {
+  background: #e8e8e8;
+}
+
+.menu-item .el-icon {
+  font-size: 20px;
+  color: #656d76;
+}
+
+.menu-item.logout {
+  color: #f56c6c;
+}
+
+.menu-item.logout .el-icon {
+  color: #f56c6c;
+}
+
+.menu-divider {
+  height: 1px;
+  background: #e5e5e5;
+  margin: 8px 20px;
+}
+
+/* ========== 移动端响应式 ========== */
+@media (max-width: 768px) {
+  .mobile-menu-btn {
+    display: flex;
+  }
+  
+  .nav-container {
+    padding: 0 12px;
+    height: 56px;
+  }
+  
+  .nav-left {
+    gap: 8px;
+  }
+  
+  .logo-text {
+    display: none;
+  }
+  
+  .nav-right {
+    gap: 8px;
+  }
+  
+  .page-header {
+    padding: 16px 0;
+  }
+  
+  .header-container {
+    padding: 0 12px;
+  }
+  
+  .page-header h1 {
+    font-size: 18px;
+  }
+  
+  .main-content {
+    padding: 12px 0;
+  }
+  
+  .content-container {
+    padding: 0 12px;
+  }
+}
+
+/* 移动端抽屉样式覆盖 */
+:deep(.mobile-drawer .el-drawer__header) {
+  padding: 20px;
+  margin-bottom: 0;
+  border-bottom: 1px solid #e5e5e5;
+}
+
+:deep(.mobile-drawer .el-drawer__body) {
+  padding: 0;
 }
 </style>
